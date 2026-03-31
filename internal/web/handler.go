@@ -3,13 +3,15 @@ package web
 import (
 	"net/http"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/geordanr/goallery2/internal/config"
+	"github.com/geordanr/goallery2/internal/gallery"
 )
 
 type handler struct {
-	db *sqlx.DB
+	store  *gallery.Store
+	config config.Config
 }
 
 func (h *handler) index(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("goallery2"))
+	http.Redirect(w, r, "/album/7", http.StatusFound)
 }

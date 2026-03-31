@@ -34,7 +34,7 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	web.RegisterRoutes(r, database)
+	web.RegisterRoutes(r, database, cfg)
 
 	log.Printf("listening on %s", cfg.Server.Addr)
 	if err := http.ListenAndServe(cfg.Server.Addr, r); err != nil {
