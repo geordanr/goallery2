@@ -15,4 +15,5 @@ func RegisterRoutes(r *chi.Mux, db *sqlx.DB, cfg config.Config) {
 	}
 
 	r.Get("/", h.index)
+	r.Get("/album/{id}", h.album)
 }

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{if .Album.Title}}{{.Album.Title}}{{else}}Album{{end}}</title>
+  <style>
+    body { font-family: sans-serif; max-width: 1200px; margin: 0 auto; padding: 1rem; }
+    h1 { margin-bottom: 0.25rem; }
+    .meta { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
+    .description { margin-bottom: 1.5rem; }
+    section { margin-bottom: 2rem; }
+    h2 { border-bottom: 1px solid #ccc; padding-bottom: 0.25rem; }
+    ul.albums { list-style: none; padding: 0; }
+    ul.albums li { margin: 0.4rem 0; }
+    .grid { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+    .grid-item { text-align: center; font-size: 0.85rem; }
+    .grid-item a { text-decoration: none; color: inherit; }
+    .grid-item img { display: block; max-width: 150px; max-height: 150px; }
+    .grid-item .label { margin-top: 0.25rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  </style>
+</head>
+<body>
+
+{{if .Breadcrumbs}}
+<nav>
+  {{range $i, $b := .Breadcrumbs -}}
+  {{- if $i}} / {{end -}}
+  {{- if $b.ID}}<a href="/album/{{$b.ID}}">{{$b.Title}}</a>{{else}}{{$b.Title}}{{end -}}
+  {{- end}}
+</nav>
+{{end}}
+
+<h1>{{if .Album.Title}}{{.Album.Title}}{{else}}Albums{{end}}</h1>
+
+{{if .Album.Description}}<p class="description">{{.Album.Description}}</p>{{end}}
+
+{{if .ChildAlbums}}
+<section>
+  <h2>Albums</h2>
+  <ul class="albums">
+    {{range .ChildAlbums}}
+    <li><a href="/album/{{.ID}}">{{if .Title}}{{.Title}}{{else}}(untitled){{end}}</a></li>
+    {{end}}
+  </ul>
+</section>
+{{end}}
+
+{{if .Photos}}
+<section>
+  <h2>Photos</h2>
+  <div class="grid">
+    {{range .Photos}}
+    <div class="grid-item">
+      <a href="/photo/{{.ID}}">
+        <img src="/photo/{{.ID}}/thumbnail" alt="{{.Title}}">
+        <span class="label">{{if .Title}}{{.Title}}{{else}}{{.PathComponent}}{{end}}</span>
+      </a>
+    </div>
+    {{end}}
+  </div>
+</section>
+{{end}}
+
+{{if .Movies}}
+<section>
+  <h2>Movies</h2>
+  <div class="grid">
+    {{range .Movies}}
+    <div class="grid-item">
+      <a href="/movie/{{.ID}}">
+        <span class="label">{{if .Title}}{{.Title}}{{else}}{{.PathComponent}}{{end}}</span>
+      </a>
+    </div>
+    {{end}}
+  </div>
+</section>
+{{end}}
+
+</body>
+</html>
