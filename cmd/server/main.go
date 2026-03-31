@@ -1,18 +1,30 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/geordanr/goallery2/internal/config"
 	"github.com/geordanr/goallery2/internal/db"
 	"github.com/geordanr/goallery2/internal/web"
 )
 
 func main() {
-	database, err := db.Connect()
+	fs := flag.CommandLine
+	configPath := fs.String("config", "", "path to TOML config file")
+	overrides := config.RegisterFlags(fs)
+	flag.Parse()
+
+	cfg, err := config.Load(*configPath, *overrides)
+	if err != nil {
+		log.Fatalf("configuration error: %v", err)
+	}
+
+	database, err := db.Connect(cfg.DB)
 	if err != nil {
 		log.Fatalf("database connection failed: %v", err)
 	}
@@ -24,8 +36,8 @@ func main() {
 
 	web.RegisterRoutes(r, database)
 
-	log.Println("listening on :8080")
-	if err := http.ListenAndServe(":8080", r); err != nil {
+	log.Printf("listening on %s", cfg.Server.Addr)
+	if err := http.ListenAndServe(cfg.Server.Addr, r); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
 }
