@@ -14,6 +14,7 @@ const (
 //
 //	g2_Entity + g2_Item + g2_FileSystemEntity + g2_AlbumItem + g2_ChildEntity
 type Album struct {
+	store          *Store
 	ID             int
 	ParentID       int // 0 = root
 	Title          string
@@ -32,6 +33,7 @@ type Album struct {
 //
 //	g2_Entity + g2_Item + g2_FileSystemEntity + g2_DataItem + g2_PhotoItem + g2_ChildEntity
 type Photo struct {
+	store         *Store
 	ID            int
 	ParentID      int // album ID
 	Title         string
@@ -52,6 +54,7 @@ type Photo struct {
 //
 //	g2_Entity + g2_Item + g2_FileSystemEntity + g2_DataItem + g2_MovieItem + g2_ChildEntity
 type Movie struct {
+	store         *Store
 	ID            int
 	ParentID      int
 	Title         string
