@@ -17,8 +17,9 @@ goallery2 is a read-only Go web application that serves image galleries original
 Gallery 2 uses **table-per-class inheritance** — every entity has a row in `g2_Entity` and additional rows in type-specific tables, all sharing the same `g_id`.
 
 ### Entity types in this database
+
 | g_entityType | Count | Tables joined |
-|---|---|---|
+| --- | --- | --- |
 | GalleryAlbumItem | 347 | Entity + Item + FileSystemEntity + AlbumItem + ChildEntity |
 | GalleryPhotoItem | 5314 | Entity + Item + FileSystemEntity + DataItem + PhotoItem + ChildEntity |
 | GalleryMovieItem | 98 | Entity + Item + FileSystemEntity + DataItem + MovieItem + ChildEntity |
@@ -26,6 +27,7 @@ Gallery 2 uses **table-per-class inheritance** — every entity has a row in `g2
 | GalleryComment | 209 | Entity + Comment |
 
 ### Key relationships
+
 - **`g2_ChildEntity`**: maps every item/album to its `g_parentId` (albums and photos alike). Root album has `g_id = 7`, `g_parentId = 0`.
 - **Full disk path**: walk `g2_ChildEntity` upward from item to root, collect `g_pathComponent` from `g2_FileSystemEntity` at each level, join with `/`. The root album (ID 7) has `g_pathComponent = NULL`.
 - **Derivatives** (`g_derivativeType = 1` = thumbnail, `2` = resized): do NOT have `g2_FileSystemEntity` entries. Their cache file paths follow Gallery 2's cache layout — to be confirmed once image files are available.
@@ -33,6 +35,7 @@ Gallery 2 uses **table-per-class inheritance** — every entity has a row in `g2
 - `g2_Derivative.g_derivativeOperations`: operation string, e.g. `thumbnail|150`.
 
 ### Go domain types
+
 Defined in `internal/gallery/types.go`: `Album`, `Photo`, `Movie`, `Derivative`.
 
 ## Architecture (planned)
