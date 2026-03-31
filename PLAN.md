@@ -10,7 +10,7 @@
 
 ### Blocked / deferred
 
-- **Thumbnail serving** (`GET /photo/{id}/thumbnail`) — derivative cache file paths follow Gallery 2's own layout, which must be confirmed against the actual data directory before implementing. The album template currently emits these links but they will 404 until this is resolved.
+- ~~**Thumbnail serving**~~ — cache layout confirmed (see Next up §1). Ready to implement.
 
 ---
 
@@ -18,11 +18,13 @@
 
 ### 1. Derivative cache path resolution
 
-Once the data directory is available, inspect it to determine Gallery 2's cache layout (likely `cache/` under the data root, with paths derived from the derivative ID). Implement:
+**Confirmed layout:** `cache/derivative/{id[0]}/{id[1]}/{id}.dat` under the g2data root — e.g. derivative ID 10047 → `cache/derivative/1/0/10047.dat`. Files are JPEG regardless of the `.dat` extension; serve with the MIME type from `g2_Derivative.g_mimeType`.
 
-- A `Derivative.CachePath(dataDir string) string` helper (or equivalent on `Store`)
-- `GET /photo/{id}/thumbnail` handler that resolves the cache path and serves the file via the same traversal-safe logic as `serveFile`
-- Update the album template to use the real thumbnail URL
+Implement:
+
+- A `Derivative.CachePath() string` method returning the relative path (e.g. `cache/derivative/1/0/10047.dat`)
+- `GET /photo/{id}/thumbnail` and `GET /movie/{id}/thumbnail` handlers that resolve the full path under `DataDir` and serve the file via the same traversal-safe logic as `serveFile`
+- Update the album template thumbnail `<img>` src to use the real thumbnail URL
 
 ### 2. Photo thumbnail on the photo detail page
 
