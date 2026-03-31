@@ -18,4 +18,5 @@ func RegisterRoutes(r *chi.Mux, db *sqlx.DB, cfg config.Config) {
 	r.Get("/album/{id}", h.album)
 	r.Get("/photo/{id}", h.photo)
 	r.Get("/movie/{id}", h.movie)
+	r.Get("/files/{path...}", h.serveFile)
 }
