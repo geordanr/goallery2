@@ -1,5 +1,7 @@
 package gallery
 
+import "slices"
+
 // GetDerivatives returns all derivatives (thumbnails, resized copies) of this movie.
 func (m *Movie) GetDerivatives() ([]Derivative, error) {
 	return m.store.derivatives(m.ID)
@@ -16,13 +18,9 @@ func (m *Movie) GetResized() ([]Derivative, error) {
 	if err != nil {
 		return nil, err
 	}
-	var resized []Derivative
-	for _, d := range all {
-		if d.Type != DerivativeThumbnail {
-			resized = append(resized, d)
-		}
-	}
-	return resized, nil
+	return slices.DeleteFunc(all, func(d Derivative) bool {
+		return d.Type == DerivativeThumbnail
+	}), nil
 }
 
 // Path returns the relative disk path of this movie.
