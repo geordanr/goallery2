@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{if .Photo.Title}}{{.Photo.Title}}{{else}}Photo{{end}}</title>
+  <style>
+    body { font-family: sans-serif; max-width: 1200px; margin: 0 auto; padding: 1rem; }
+    h1 { margin-bottom: 0.25rem; }
+    .meta { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
+    .description { margin-bottom: 1.5rem; }
+    .photo-wrap { margin-bottom: 1.5rem; }
+    .photo-wrap img { max-width: 100%; height: auto; display: block; }
+  </style>
+</head>
+<body>
+
+{{if .Breadcrumbs}}
+<nav>
+  {{range $i, $b := .Breadcrumbs -}}
+  {{- if $i}} / {{end -}}
+  {{- if $b.ID}}<a href="/album/{{$b.ID}}">{{$b.Title}}</a>{{else}}{{$b.Title}}{{end -}}
+  {{- end}}
+</nav>
+{{end}}
+
+<h1>{{if .Photo.Title}}{{.Photo.Title}}{{else}}{{.Photo.PathComponent}}{{end}}</h1>
+
+<p class="meta">
+  {{.Photo.Width}}&times;{{.Photo.Height}} &middot; {{.Photo.MimeType}} &middot; {{.Photo.FileSize}} bytes
+  {{if not .Photo.OriginatedAt.IsZero}} &middot; {{.Photo.OriginatedAt.Format "2006-01-02"}}{{end}}
+</p>
+
+{{if .Photo.Description}}<p class="description">{{.Photo.Description}}</p>{{end}}
+
+<div class="photo-wrap">
+  <img src="/files/{{.DiskPath}}" alt="{{.Photo.Title}}">
+</div>
+
+</body>
+</html>

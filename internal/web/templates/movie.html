@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{if .Movie.Title}}{{.Movie.Title}}{{else}}Movie{{end}}</title>
+  <style>
+    body { font-family: sans-serif; max-width: 1200px; margin: 0 auto; padding: 1rem; }
+    h1 { margin-bottom: 0.25rem; }
+    .meta { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
+    .description { margin-bottom: 1.5rem; }
+    .movie-wrap { margin-bottom: 1.5rem; }
+    .movie-wrap video { max-width: 100%; height: auto; display: block; }
+  </style>
+</head>
+<body>
+
+{{if .Breadcrumbs}}
+<nav>
+  {{range $i, $b := .Breadcrumbs -}}
+  {{- if $i}} / {{end -}}
+  {{- if $b.ID}}<a href="/album/{{$b.ID}}">{{$b.Title}}</a>{{else}}{{$b.Title}}{{end -}}
+  {{- end}}
+</nav>
+{{end}}
+
+<h1>{{if .Movie.Title}}{{.Movie.Title}}{{else}}{{.Movie.PathComponent}}{{end}}</h1>
+
+<p class="meta">
+  {{.Movie.Width}}&times;{{.Movie.Height}} &middot; {{.Movie.MimeType}} &middot; {{.Movie.Duration}}s &middot; {{.Movie.FileSize}} bytes
+  {{if not .Movie.OriginatedAt.IsZero}} &middot; {{.Movie.OriginatedAt.Format "2006-01-02"}}{{end}}
+</p>
+
+{{if .Movie.Description}}<p class="description">{{.Movie.Description}}</p>{{end}}
+
+<div class="movie-wrap">
+  <video controls src="/files/{{.DiskPath}}" type="{{.Movie.MimeType}}">
+    Your browser does not support the video tag.
+  </video>
+</div>
+
+</body>
+</html>
