@@ -11,6 +11,25 @@ import (
 
 const rootAlbumID = 7
 
+// Reader is the interface for reading Gallery 2 data. *Store implements it.
+// Callers outside internal/gallery should depend on Reader rather than *Store
+// so that alternate implementations (e.g. in-memory fakes for tests) can be
+// substituted without changing the callers.
+type Reader interface {
+	GetRootAlbum() (*Album, error)
+	GetAlbum(id int) (*Album, error)
+	GetPhoto(id int) (*Photo, error)
+	GetMovie(id int) (*Movie, error)
+	ChildAlbums(parentID int) ([]Album, error)
+	AlbumPhotos(albumID int) ([]Photo, error)
+	AlbumMovies(albumID int) ([]Movie, error)
+	Derivatives(sourceID int) ([]Derivative, error)
+	Thumbnail(sourceID int) (*Derivative, error)
+	ItemPath(id int) (string, error)
+}
+
+var _ Reader = (*Store)(nil) // compile-time check
+
 // Store provides access to Gallery 2 data. It is the entry point for loading
 // albums, photos, and movies; the returned values carry a reference back to the
 // Store so their methods can lazily load related entities.
@@ -61,13 +80,14 @@ func (s *Store) GetMovie(id int) (*Movie, error) {
 	return &m, nil
 }
 
-// ── internal query helpers ────────────────────────────────────────────────────
+// ── query methods ─────────────────────────────────────────────────────────────
 
-func (s *Store) childAlbums(parentID int) ([]Album, error) {
+// ChildAlbums returns all direct child albums of the given parent album.
+func (s *Store) ChildAlbums(parentID int) ([]Album, error) {
 	var rows []albumRow
 	err := s.db.Select(&rows, albumSelect+` WHERE ce.g_parentId = ? ORDER BY i.g_title`, parentID)
 	if err != nil {
-		return nil, fmt.Errorf("childAlbums %d: %w", parentID, err)
+		return nil, fmt.Errorf("child albums for parent %d: %w", parentID, err)
 	}
 	albums := make([]Album, len(rows))
 	for i, r := range rows {
@@ -76,11 +96,12 @@ func (s *Store) childAlbums(parentID int) ([]Album, error) {
 	return albums, nil
 }
 
-func (s *Store) albumPhotos(albumID int) ([]Photo, error) {
+// AlbumPhotos returns all photos in the given album.
+func (s *Store) AlbumPhotos(albumID int) ([]Photo, error) {
 	var rows []photoRow
 	err := s.db.Select(&rows, photoSelect+` WHERE ce.g_parentId = ? ORDER BY i.g_originationTimestamp, i.g_title`, albumID)
 	if err != nil {
-		return nil, fmt.Errorf("albumPhotos %d: %w", albumID, err)
+		return nil, fmt.Errorf("photos for album %d: %w", albumID, err)
 	}
 	photos := make([]Photo, len(rows))
 	for i, r := range rows {
@@ -89,11 +110,12 @@ func (s *Store) albumPhotos(albumID int) ([]Photo, error) {
 	return photos, nil
 }
 
-func (s *Store) albumMovies(albumID int) ([]Movie, error) {
+// AlbumMovies returns all movies in the given album.
+func (s *Store) AlbumMovies(albumID int) ([]Movie, error) {
 	var rows []movieRow
 	err := s.db.Select(&rows, movieSelect+` WHERE ce.g_parentId = ? ORDER BY i.g_originationTimestamp, i.g_title`, albumID)
 	if err != nil {
-		return nil, fmt.Errorf("albumMovies %d: %w", albumID, err)
+		return nil, fmt.Errorf("movies for album %d: %w", albumID, err)
 	}
 	movies := make([]Movie, len(rows))
 	for i, r := range rows {
@@ -102,11 +124,12 @@ func (s *Store) albumMovies(albumID int) ([]Movie, error) {
 	return movies, nil
 }
 
-func (s *Store) derivatives(sourceID int) ([]Derivative, error) {
+// Derivatives returns all derivatives (thumbnails, resized copies) of the given source item.
+func (s *Store) Derivatives(sourceID int) ([]Derivative, error) {
 	var rows []derivativeRow
 	err := s.db.Select(&rows, derivativeSelect+` WHERE d.g_derivativeSourceId = ? ORDER BY d.g_derivativeOrder`, sourceID)
 	if err != nil {
-		return nil, fmt.Errorf("derivatives %d: %w", sourceID, err)
+		return nil, fmt.Errorf("derivatives for source %d: %w", sourceID, err)
 	}
 	derivs := make([]Derivative, len(rows))
 	for i, r := range rows {
@@ -115,20 +138,21 @@ func (s *Store) derivatives(sourceID int) ([]Derivative, error) {
 	return derivs, nil
 }
 
-func (s *Store) thumbnail(sourceID int) (*Derivative, error) {
+// Thumbnail returns the thumbnail derivative for the given source item.
+func (s *Store) Thumbnail(sourceID int) (*Derivative, error) {
 	var row derivativeRow
 	err := s.db.Get(&row, derivativeSelect+` WHERE d.g_derivativeSourceId = ? AND d.g_derivativeType = ?`,
 		sourceID, DerivativeThumbnail)
 	if err != nil {
-		return nil, fmt.Errorf("thumbnail %d: %w", sourceID, err)
+		return nil, fmt.Errorf("thumbnail for source %d: %w", sourceID, err)
 	}
 	d := row.toDerivative()
 	return &d, nil
 }
 
-// itemPath walks g2_ChildEntity upward from id to the root, collecting
+// ItemPath walks g2_ChildEntity upward from id to the root, collecting
 // g_pathComponent values, and joins them into a relative disk path.
-func (s *Store) itemPath(id int) (string, error) {
+func (s *Store) ItemPath(id int) (string, error) {
 	type node struct {
 		ParentID      int    `db:"parent_id"`
 		PathComponent string `db:"path_component"`
@@ -146,7 +170,7 @@ func (s *Store) itemPath(id int) (string, error) {
 			JOIN g2_FileSystemEntity fse ON fse.g_id = ce.g_id
 			WHERE ce.g_id = ?`, current)
 		if err != nil {
-			return "", fmt.Errorf("itemPath %d (at node %d): %w", id, current, err)
+			return "", fmt.Errorf("ItemPath %d (at node %d): %w", id, current, err)
 		}
 		if n.PathComponent != "" {
 			components = append(components, n.PathComponent)
@@ -207,9 +231,9 @@ type albumRow struct {
 	OriginatedAt   int64  `db:"originated_at"`
 }
 
-func (r albumRow) toAlbum(s *Store) Album {
+func (r albumRow) toAlbum(reader Reader) Album {
 	return Album{
-		store:          s,
+		reader:         reader,
 		ID:             r.ID,
 		ParentID:       r.ParentID,
 		Title:          r.Title,
@@ -265,9 +289,9 @@ type photoRow struct {
 	OriginatedAt  int64  `db:"originated_at"`
 }
 
-func (r photoRow) toPhoto(s *Store) Photo {
+func (r photoRow) toPhoto(reader Reader) Photo {
 	return Photo{
-		store:         s,
+		reader:        reader,
 		ID:            r.ID,
 		ParentID:      r.ParentID,
 		Title:         r.Title,
@@ -327,9 +351,9 @@ type movieRow struct {
 	OriginatedAt  int64  `db:"originated_at"`
 }
 
-func (r movieRow) toMovie(s *Store) Movie {
+func (r movieRow) toMovie(reader Reader) Movie {
 	return Movie{
-		store:         s,
+		reader:        reader,
 		ID:            r.ID,
 		ParentID:      r.ParentID,
 		Title:         r.Title,

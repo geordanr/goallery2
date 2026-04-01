@@ -8,16 +8,13 @@
 - **`internal/gallery`** — `Store` with all DB queries for albums, photos, movies, derivatives; `itemPath` walk (prepends `albums/`, joins with `/`); `Derivative.CachePath()`; lazy-load methods on domain types
 - **`internal/web`** — chi router; `GET /`, `GET /album/{id}`, `GET /photo/{id}`, `GET /photo/{id}/thumbnail`, `GET /movie/{id}`, `GET /movie/{id}/thumbnail`, `GET /files/*`; embedded HTML templates; breadcrumb nav; path-traversal-safe file serving
 - **Thumbnail serving** — `Derivative.CachePath()` confirmed against real data; thumbnails and full images serving correctly
+- **Movie playback** — 206 Partial Content is correct range-request behavior. Real issue: `.avi`/`.mov` not natively browser-playable. Fixed `<source type="">` placement; added download link fallback.
 
 ---
 
 ## Next up
 
-### 1. Fix movie playback (206 status)
-
-~~Movies return HTTP 206 when viewed.~~ 206 Partial Content is correct — browsers always use range requests for video. The real issue: movies are `.avi`/`.mov` files which modern browsers cannot play natively. Fixed: move `type` to a `<source>` element (was on `<video>` directly) and add a download link so the video is still accessible.
-
-### 2. Evaluate SQL layer / ORM migration
+### 1. Evaluate SQL layer / ORM migration
 
 Now that the full set of queries is written in `internal/gallery`, assess whether to stay with raw sqlx or adopt a query builder or ORM. Key questions:
 
@@ -26,33 +23,33 @@ Now that the full set of queries is written in `internal/gallery`, assess whethe
 - If migrating, keep the existing sqlx implementation as a reference and introduce a `StoreInterface` (already planned for web tests) so the HTTP and Flickr layers are decoupled from the concrete implementation.
 - A `StoreInterface` also opens the door to alternative DB backends (e.g. SQLite for testing, PostgreSQL in future) without changing callers.
 
-Decision should be made before §6 (sort order) and §7 (pagination), which will add new queries.
+Decision should be made before §5 (sort order) and §6 (pagination), which will add new queries.
 
-### 3. Photo thumbnail on photo detail page
+### 2. Photo thumbnail on photo detail page
 
 The photo detail page currently shows the full-size image directly. Add a resized derivative to the photo detail view if one exists (`GetResized()`).
 
-### 4. Movie thumbnails
+### 3. Movie thumbnails
 
 Investigate whether derivatives exist for movies in the DB. If so, serve them through the existing derivative path; if not, decide on a fallback.
 
-### 5. Album thumbnail / cover image
+### 4. Album thumbnail / cover image
 
 Gallery 2 albums can have a highlight image. Add `g2_AlbumItem.g_highlightId` to the album query and show a cover thumbnail on the album listing page.
 
-### 6. Previous / next links in photo view
+### 5. Previous / next links in photo view
 
 Add previous/next navigation links on the photo detail page. Requires the store to return an ordered list of photos for an album so adjacent IDs can be looked up.
 
-### 7. Sort order
+### 6. Sort order
 
-Extend album/photo listings to support sorting by title (current default), creation date, and last-modified date. Build on the ordered list introduced in §6.
+Extend album/photo listings to support sorting by title (current default), creation date, and last-modified date. Build on the ordered list introduced in §5.
 
-### 8. Pagination
+### 7. Pagination
 
-Show N items per page on album listings. Depends on stable sort order (§7) so page boundaries are consistent.
+Show N items per page on album listings. Depends on stable sort order (§6) so page boundaries are consistent.
 
-### 9. Tests
+### 8. Tests
 
 #### `internal/config`
 
@@ -91,7 +88,7 @@ HTTP handler tests using `net/http/httptest`. The handlers depend on `gallery.St
 - `TestServeFile_NotFound` — nonexistent path; verify 404
 - `TestServeFile_Directory` — path resolves to a directory; verify 404
 
-### 10. Flickr export / upload (`cmd/flickr_upload`)
+### 9. Flickr export / upload (`cmd/flickr_upload`)
 
 A standalone binary that walks albums and uploads photos and movies to Flickr using the [Flickr upload API](https://www.flickr.com/services/api/upload.api.html). Items are uploaded as private. Preserve as much Gallery 2 metadata as possible (title, description/caption, tags, date taken).
 
@@ -104,7 +101,7 @@ Design notes:
 - Respect Flickr rate limits; log progress per item
 - `cmd/flickr_upload` takes `-config` (same TOML as the server) plus Flickr-specific flags (`-flickr-key`, `-flickr-secret`, `-flickr-token`, `-flickr-token-secret`)
 
-### 11. gRPC / protobuf interface (future)
+### 10. gRPC / protobuf interface (future)
 
 A secondary read-only interface for mobile clients. Design notes:
 

@@ -8,7 +8,7 @@ import (
 )
 
 type handler struct {
-	store  *gallery.Store
+	store  gallery.Reader
 	config config.Config
 }
 

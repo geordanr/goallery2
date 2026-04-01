@@ -4,17 +4,17 @@ import "slices"
 
 // GetDerivatives returns all derivatives (thumbnails, resized copies) of this movie.
 func (m *Movie) GetDerivatives() ([]Derivative, error) {
-	return m.store.derivatives(m.ID)
+	return m.reader.Derivatives(m.ID)
 }
 
 // GetThumbnail returns the thumbnail derivative for this movie.
 func (m *Movie) GetThumbnail() (*Derivative, error) {
-	return m.store.thumbnail(m.ID)
+	return m.reader.Thumbnail(m.ID)
 }
 
 // GetResized returns all non-thumbnail derivatives for this movie.
 func (m *Movie) GetResized() ([]Derivative, error) {
-	all, err := m.store.derivatives(m.ID)
+	all, err := m.reader.Derivatives(m.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -25,5 +25,5 @@ func (m *Movie) GetResized() ([]Derivative, error) {
 
 // Path returns the relative disk path of this movie.
 func (m *Movie) Path() (string, error) {
-	return m.store.itemPath(m.ID)
+	return m.reader.ItemPath(m.ID)
 }
