@@ -20,5 +20,5 @@ func RegisterRoutes(r *chi.Mux, db *sqlx.DB, cfg config.Config) {
 	r.Get("/photo/{id}/thumbnail", h.photoThumbnail)
 	r.Get("/movie/{id}", h.movie)
 	r.Get("/movie/{id}/thumbnail", h.movieThumbnail)
-	r.Get("/files/{*path}", h.serveFile)
+	r.Get("/files/*", h.serveFile)
 }

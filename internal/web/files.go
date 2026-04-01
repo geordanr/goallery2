@@ -21,7 +21,7 @@ func (h *handler) serveFile(w http.ResponseWriter, r *http.Request) {
 
 	// {path...} captures everything after /files/ as a single value, including
 	// slashes — e.g. /files/foo/bar/image.jpg → "foo/bar/image.jpg".
-	rawPath := chi.URLParam(r, "path")
+	rawPath := chi.URLParam(r, "*")
 
 	// Join and clean to collapse any ".." components, then confirm the result
 	// still lives under absDataDir. This prevents path traversal attacks.
