@@ -15,7 +15,7 @@
 
 ### 1. Fix movie playback (206 status)
 
-Movies return HTTP 206 when viewed. Investigate the movie handler and file serving path — likely a range-request or content-length issue with how the video file is being served.
+~~Movies return HTTP 206 when viewed.~~ 206 Partial Content is correct — browsers always use range requests for video. The real issue: movies are `.avi`/`.mov` files which modern browsers cannot play natively. Fixed: move `type` to a `<source>` element (was on `<video>` directly) and add a download link so the video is still accessible.
 
 ### 2. Evaluate SQL layer / ORM migration
 

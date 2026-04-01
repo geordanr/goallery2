@@ -10,6 +10,7 @@
     .description { margin-bottom: 1.5rem; }
     .movie-wrap { margin-bottom: 1.5rem; }
     .movie-wrap video { max-width: 100%; height: auto; display: block; }
+    .download { margin-top: 0.5rem; font-size: 0.9rem; }
   </style>
 </head>
 <body>
@@ -33,9 +34,11 @@
 {{if .Movie.Description}}<p class="description">{{.Movie.Description}}</p>{{end}}
 
 <div class="movie-wrap">
-  <video controls src="/files/{{.DiskPath}}" type="{{.Movie.MimeType}}">
-    Your browser does not support the video tag.
+  <video controls>
+    <source src="/files/{{.DiskPath}}" type="{{.Movie.MimeType}}">
+    Your browser does not support this video format.
   </video>
+  <p class="download"><a href="/files/{{.DiskPath}}">Download video</a></p>
 </div>
 
 </body>
