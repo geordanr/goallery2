@@ -42,6 +42,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("configuration error: %v", err)
 	}
+	if cfg.Server.DataDir == "" {
+		log.Fatal("data_dir is not set; specify it in the config file under [server] or with the -data-dir flag")
+	}
 
 	database, err := db.Connect(cfg.DB)
 	if err != nil {

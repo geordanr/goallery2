@@ -33,8 +33,9 @@ type DBConfig struct {
 func defaults() Config {
 	return Config{
 		Server: ServerConfig{
-			Addr:    ":8080",
-			DataDir: "./data",
+			Addr: ":8080",
+			// DataDir has no default — it must be set explicitly via config file
+			// or the -data-dir flag, since it is installation-specific.
 		},
 		DB: DBConfig{
 			User: "root",
@@ -53,11 +54,11 @@ func Load(path string, overrides Overrides) (Config, error) {
 	if path != "" {
 		f, err := os.Open(path)
 		if err != nil {
-			return Config{}, fmt.Errorf("open config file: %w", err)
+			return Config{}, fmt.Errorf("could not open config file %q: %w\n  check that the path passed to -config exists and is readable", path, err)
 		}
 		defer func() { _ = f.Close() }()
 		if _, err := toml.NewDecoder(f).Decode(&cfg); err != nil {
-			return Config{}, fmt.Errorf("parse config file: %w", err)
+			return Config{}, fmt.Errorf("could not parse config file %q: %w\n  verify the file is valid TOML and all keys are spelled correctly", path, err)
 		}
 	}
 

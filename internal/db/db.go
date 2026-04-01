@@ -15,7 +15,7 @@ func Connect(cfg config.DBConfig) (*sqlx.DB, error) {
 		cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Name)
 	db, err := sqlx.Connect("mysql", dsn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not connect to MySQL at %s:%d as %s: %w\n  check that the server is running and that the credentials and database name in the config file are correct", cfg.Host, cfg.Port, cfg.User, err)
 	}
 	return db, nil
 }
