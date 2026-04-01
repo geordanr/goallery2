@@ -2,8 +2,8 @@ package gallery
 
 import (
 	"fmt"
-	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -157,7 +157,14 @@ func (s *Store) itemPath(id int) (string, error) {
 	// Reverse: collected leaf→root, want root→leaf.
 	slices.Reverse(components)
 
-	return filepath.Join(components...), nil
+	return joinPathComponents(components), nil
+}
+
+// joinPathComponents joins path components with forward slashes regardless of
+// OS. Paths are used in URLs and as arguments to filepath.FromSlash, so they
+// must never contain OS-native separators.
+func joinPathComponents(components []string) string {
+	return strings.Join(components, "/")
 }
 
 // ── scan row types ────────────────────────────────────────────────────────────
