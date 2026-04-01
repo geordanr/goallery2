@@ -5,36 +5,23 @@
 ### Done
 
 - **`internal/config`** — TOML config file + CLI flag overrides; `db.Connect` takes typed `DBConfig`
-- **`internal/gallery`** — `Store` with all DB queries for albums, photos, movies, derivatives; `itemPath` walk; lazy-load methods on domain types
-- **`internal/web`** — chi router; `GET /`, `GET /album/{id}`, `GET /photo/{id}`, `GET /movie/{id}`, `GET /files/{path...}`; embedded HTML templates; breadcrumb nav; path-traversal-safe file serving
-
-### Blocked / deferred
-
-- ~~**Thumbnail serving**~~ — cache layout confirmed (see Next up §1). Ready to implement.
+- **`internal/gallery`** — `Store` with all DB queries for albums, photos, movies, derivatives; `itemPath` walk (prepends `albums/`, joins with `/`); `Derivative.CachePath()`; lazy-load methods on domain types
+- **`internal/web`** — chi router; `GET /`, `GET /album/{id}`, `GET /photo/{id}`, `GET /photo/{id}/thumbnail`, `GET /movie/{id}`, `GET /movie/{id}/thumbnail`, `GET /files/*`; embedded HTML templates; breadcrumb nav; path-traversal-safe file serving
+- **Thumbnail serving** — `Derivative.CachePath()` confirmed against real data; thumbnails and full images serving correctly
 
 ---
 
 ## Next up
 
-### 1. Derivative cache path resolution
+### 1. Photo thumbnail on the photo detail page
 
-**Confirmed layout:** `cache/derivative/{id[0]}/{id[1]}/{id}.dat` under the g2data root — e.g. derivative ID 10047 → `cache/derivative/1/0/10047.dat`. Files are JPEG regardless of the `.dat` extension; serve with the MIME type from `g2_Derivative.g_mimeType`.
+The photo detail page currently shows the full-size image directly. Add a resized derivative to the photo detail view if one exists (`GetResized()`).
 
-Implement:
-
-- A `Derivative.CachePath() string` method returning the relative path (e.g. `cache/derivative/1/0/10047.dat`)
-- `GET /photo/{id}/thumbnail` and `GET /movie/{id}/thumbnail` handlers that resolve the full path under `DataDir` and serve the file via the same traversal-safe logic as `serveFile`
-- Update the album template thumbnail `<img>` src to use the real thumbnail URL
-
-### 2. Photo thumbnail on the photo detail page
-
-The photo detail page currently shows the full-size image directly. Once thumbnails are working, add a resized derivative to the photo detail view if one exists.
-
-### 3. Album thumbnail / cover image
+### 2. Album thumbnail / cover image
 
 Gallery 2 albums can have a highlight image. Add `g2_AlbumItem.g_highlightId` to the album query and show a cover thumbnail on the album listing page.
 
-### 4. gRPC / protobuf interface (future)
+### 3. gRPC / protobuf interface (future)
 
 A secondary read-only interface for mobile clients. Design notes:
 
@@ -65,7 +52,7 @@ Integration tests against a real MySQL instance. The Gallery 2 schema is fixed a
 - `TestChildAlbums` — known parent, expected child count / IDs
 - `TestAlbumPhotos` / `TestAlbumMovies` — known album, spot-check returned items
 - `TestGetPhoto` / `TestGetMovie` — known IDs, verify fields
-- `TestItemPath` — known photo ID, verify reconstructed path matches expected string
+- `TestItemPath` — known photo ID, verify reconstructed path starts with `albums/` and uses forward slashes
 - `TestGetDerivatives` / `TestGetThumbnail` — known photo ID with derivatives
 
 ### `internal/web`
@@ -77,6 +64,7 @@ HTTP handler tests using `net/http/httptest`. The handlers depend on `gallery.St
 - `TestAlbumHandler` — mock store returns a known album; verify status 200, template renders title and child links
 - `TestAlbumNotFound` — store returns `sql.ErrNoRows`-wrapped error; verify 404
 - `TestPhotoHandler` / `TestMovieHandler` — similar shape
+- `TestFileRouteMatches` — verify chi `/*` wildcard matches single and multi-segment paths ✓ (done)
 - `TestServeFile_OK` — temp file under a temp data dir; verify 200 and correct content
 - `TestServeFile_Traversal` — paths like `../secret`; verify 403
 - `TestServeFile_NotFound` — nonexistent path; verify 404
