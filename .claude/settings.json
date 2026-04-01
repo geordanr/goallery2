@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "agent",
+            "if": "Bash(git commit*)",
+            "prompt": "A git commit is about to be made. Run the code-reviewer agent: review all staged changes with `git diff --staged`, check the changed files for readability, Go idioms, and edge cases, and report any issues. If you find Must Fix issues, set permissionDecision to 'deny' and explain why in the reason field. If you find Should Fix or Consider issues only, set permissionDecision to 'ask'. If there are no issues, set permissionDecision to 'allow'.",
+            "statusMessage": "Reviewing staged changes...",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}
