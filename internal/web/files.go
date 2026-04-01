@@ -27,7 +27,7 @@ func (h *handler) serveFile(w http.ResponseWriter, r *http.Request) {
 	// still lives under absDataDir. This prevents path traversal attacks.
 	target := filepath.Clean(filepath.Join(absDataDir, filepath.FromSlash(rawPath)))
 
-	slog.Debug("serveFile", "target", target)
+	slog.Debug("serveFile", "raw_path", rawPath, "target", target)
 
 	if !strings.HasPrefix(target, absDataDir+string(filepath.Separator)) {
 		http.Error(w, "forbidden", http.StatusForbidden)
@@ -39,8 +39,10 @@ func (h *handler) serveFile(w http.ResponseWriter, r *http.Request) {
 	info, err := os.Stat(target)
 	if err != nil {
 		if os.IsNotExist(err) {
+			slog.Debug("serveFile: not found", "target", target)
 			http.Error(w, "not found", http.StatusNotFound)
 		} else {
+			slog.Debug("serveFile: stat error", "target", target, "err", err)
 			http.Error(w, "error accessing file", http.StatusInternalServerError)
 		}
 		return

@@ -28,6 +28,16 @@ func main() {
 	}
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})))
 
+	if *debug {
+		slog.Info("debug logging enabled")
+		// Route chi's access log through slog so all output is on the same
+		// stream (stderr) in the same format.
+		middleware.DefaultLogger = middleware.RequestLogger(&middleware.DefaultLogFormatter{
+			Logger:  slog.NewLogLogger(slog.Default().Handler(), slog.LevelInfo),
+			NoColor: true,
+		})
+	}
+
 	cfg, err := config.Load(*configPath, *overrides)
 	if err != nil {
 		log.Fatalf("configuration error: %v", err)
