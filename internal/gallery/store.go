@@ -157,7 +157,10 @@ func (s *Store) itemPath(id int) (string, error) {
 	// Reverse: collected leaf→root, want root→leaf.
 	slices.Reverse(components)
 
-	return joinPathComponents(components), nil
+	// Gallery 2 stores all album/photo/movie files under an "albums/" subtree
+	// within the data directory. The root album (ID 7) has a NULL path
+	// component, so "albums" never appears in the walk — prepend it here.
+	return joinPathComponents(append([]string{"albums"}, components...)), nil
 }
 
 // joinPathComponents joins path components with forward slashes regardless of
