@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"log"
+	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -16,8 +18,15 @@ import (
 func main() {
 	fs := flag.CommandLine
 	configPath := fs.String("config", "", "path to TOML config file")
+	debug := fs.Bool("debug", false, "enable debug logging")
 	overrides := config.RegisterFlags(fs)
 	flag.Parse()
+
+	logLevel := new(slog.LevelVar) // defaults to INFO
+	if *debug {
+		logLevel.Set(slog.LevelDebug)
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})))
 
 	cfg, err := config.Load(*configPath, *overrides)
 	if err != nil {
@@ -36,7 +45,7 @@ func main() {
 
 	web.RegisterRoutes(r, database, cfg)
 
-	log.Printf("listening on %s", cfg.Server.Addr)
+	slog.Info("listening", "addr", cfg.Server.Addr)
 	if err := http.ListenAndServe(cfg.Server.Addr, r); err != nil {
 		log.Fatalf("server error: %v", err)
 	}

@@ -1,11 +1,13 @@
 package web
 
 import (
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"strconv"
+	"strings"
+
 	"github.com/go-chi/chi/v5"
 
 	"github.com/geordanr/goallery2/internal/gallery"
@@ -62,6 +64,8 @@ func (h *handler) serveDerivative(w http.ResponseWriter, r *http.Request, d *gal
 
 	target := filepath.Clean(filepath.Join(absDataDir, filepath.FromSlash(d.CachePath())))
 
+	slog.Debug("serveDerivative", "target", target)
+
 	if !strings.HasPrefix(target, absDataDir+string(filepath.Separator)) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
@@ -87,4 +91,3 @@ func (h *handler) serveDerivative(w http.ResponseWriter, r *http.Request, d *gal
 	w.Header().Set("Content-Type", d.MimeType)
 	http.ServeContent(w, r, "", stat.ModTime(), f)
 }
-

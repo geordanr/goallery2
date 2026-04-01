@@ -1,6 +1,7 @@
 package web
 
 import (
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -25,6 +26,8 @@ func (h *handler) serveFile(w http.ResponseWriter, r *http.Request) {
 	// Join and clean to collapse any ".." components, then confirm the result
 	// still lives under absDataDir. This prevents path traversal attacks.
 	target := filepath.Clean(filepath.Join(absDataDir, filepath.FromSlash(rawPath)))
+
+	slog.Debug("serveFile", "target", target)
 
 	if !strings.HasPrefix(target, absDataDir+string(filepath.Separator)) {
 		http.Error(w, "forbidden", http.StatusForbidden)
