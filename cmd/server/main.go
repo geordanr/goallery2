@@ -37,7 +37,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("database connection failed: %v", err)
 	}
-	defer database.Close()
+	defer func() { _ = database.Close() }()
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)

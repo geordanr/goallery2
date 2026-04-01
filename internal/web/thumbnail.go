@@ -80,7 +80,7 @@ func (h *handler) serveDerivative(w http.ResponseWriter, r *http.Request, d *gal
 		}
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	stat, err := f.Stat()
 	if err != nil {

@@ -55,7 +55,7 @@ func Load(path string, overrides Overrides) (Config, error) {
 		if err != nil {
 			return Config{}, fmt.Errorf("open config file: %w", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		if _, err := toml.NewDecoder(f).Decode(&cfg); err != nil {
 			return Config{}, fmt.Errorf("parse config file: %w", err)
 		}
@@ -67,13 +67,13 @@ func Load(path string, overrides Overrides) (Config, error) {
 
 // Overrides holds CLI flag values. Zero values mean "not set; keep file/default value."
 type Overrides struct {
-	Addr     string
-	DataDir  string
-	DBUser   string
-	DBPass   string
-	DBHost   string
-	DBPort   int
-	DBName   string
+	Addr    string
+	DataDir string
+	DBUser  string
+	DBPass  string
+	DBHost  string
+	DBPort  int
+	DBName  string
 }
 
 func (o Overrides) apply(cfg *Config) {

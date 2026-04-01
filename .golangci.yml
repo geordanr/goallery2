@@ -1,0 +1,23 @@
+version: "2"
+
+linters:
+  enable:
+    - govet          # go vet checks
+    - staticcheck    # correctness + style + simplification (absorbs gosimple in v2)
+    - errcheck       # flags unchecked errors
+    - ineffassign    # detects assignments whose values are never used
+    - unused         # detects unused code
+    - misspell       # catches common English spelling mistakes in comments/strings
+    - whitespace     # flags unnecessary blank lines at start/end of blocks
+
+formatters:
+  enable:
+    - goimports      # enforces sorted, grouped imports (superset of gofmt)
+
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/geordanr/goallery2  # keeps local imports in their own group
+
+issues:
+  max-same-issues: 0   # report every instance, not just the first few

@@ -80,9 +80,9 @@ type Movie struct {
 // by Gallery 2's cache layout (to be confirmed once image files are available).
 type Derivative struct {
 	ID         int
-	SourceID   int            // ID of the Photo or Movie this was derived from
-	Operations string         // e.g. "thumbnail|150"
-	Order      int            // ordering among derivatives of the same source
+	SourceID   int    // ID of the Photo or Movie this was derived from
+	Operations string // e.g. "thumbnail|150"
+	Order      int    // ordering among derivatives of the same source
 	FileSize   int
 	Type       DerivativeType // DerivativeThumbnail or DerivativeResized
 	MimeType   string
