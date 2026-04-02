@@ -1,6 +1,9 @@
 package web
 
 import (
+	"database/sql"
+	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -10,9 +13,11 @@ import (
 )
 
 type photoData struct {
-	Photo       *gallery.Photo
-	DiskPath    string
-	Breadcrumbs []breadcrumb
+	Photo        *gallery.Photo
+	DiskPath     string
+	ResizedPath  string // non-empty when a resized derivative exists; use /files/ResizedPath
+	DisplayTitle string // Photo.Title if set, otherwise Photo.PathComponent
+	Breadcrumbs  []breadcrumb
 }
 
 func (h *handler) photo(w http.ResponseWriter, r *http.Request) {
@@ -24,7 +29,11 @@ func (h *handler) photo(w http.ResponseWriter, r *http.Request) {
 
 	photo, err := h.store.GetPhoto(id)
 	if err != nil {
-		http.Error(w, "photo not found", http.StatusNotFound)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "photo not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "error loading photo", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -40,15 +49,30 @@ func (h *handler) photo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Derivative query failure degrades gracefully — the photo loaded
+	// successfully, so show the full-size image and log the error.
+	// GetResized returns results sorted by Order, so index 0 is the primary.
+	resized, resizedErr := photo.GetResized()
+	if resizedErr != nil {
+		slog.Error("could not load resized derivatives; falling back to full-size", "photo_id", id, "err", resizedErr)
+	}
+	var resizedPath string
+	if resizedErr == nil && len(resized) > 0 {
+		resizedPath = resized[0].CachePath()
+	}
+
 	data := photoData{
-		Photo:       photo,
-		DiskPath:    diskPath,
-		Breadcrumbs: breadcrumbs,
+		Photo:        photo,
+		DiskPath:     diskPath,
+		ResizedPath:  resizedPath,
+		DisplayTitle: photo.DisplayTitle(),
+		Breadcrumbs:  breadcrumbs,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := photoTmpl.Execute(w, data); err != nil {
-		http.Error(w, "render error", http.StatusInternalServerError)
+		// Headers already sent; http.Error would be ignored. Log instead.
+		slog.Error("photo template render failed", "photo_id", id, "err", err)
 	}
 }
 
@@ -65,9 +89,5 @@ func (h *handler) photoBreadcrumbs(photo *gallery.Photo) ([]breadcrumb, error) {
 	if len(crumbs) > 0 {
 		crumbs[len(crumbs)-1].ID = parent.ID
 	}
-	title := photo.Title
-	if title == "" {
-		title = photo.PathComponent
-	}
-	return append(crumbs, breadcrumb{Title: title}), nil
+	return append(crumbs, breadcrumb{Title: photo.DisplayTitle()}), nil
 }

@@ -1,6 +1,8 @@
 package web
 
 import (
+	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -21,12 +23,21 @@ func (h *handler) photoThumbnail(w http.ResponseWriter, r *http.Request) {
 	}
 	photo, err := h.store.GetPhoto(id)
 	if err != nil {
-		http.Error(w, "photo not found", http.StatusNotFound)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "photo not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "error loading photo", http.StatusInternalServerError)
+		}
 		return
 	}
 	thumb, err := photo.GetThumbnail()
 	if err != nil {
-		http.Error(w, "thumbnail not found", http.StatusNotFound)
+		// errors.Is (not ==) because store.Thumbnail wraps sql.ErrNoRows with %w.
+		if errors.Is(err, sql.ErrNoRows) { // no thumbnail in DB → 404
+			http.Error(w, "photo thumbnail not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "error fetching photo thumbnail", http.StatusInternalServerError)
+		}
 		return
 	}
 	h.serveDerivative(w, r, thumb)
@@ -40,12 +51,21 @@ func (h *handler) movieThumbnail(w http.ResponseWriter, r *http.Request) {
 	}
 	movie, err := h.store.GetMovie(id)
 	if err != nil {
-		http.Error(w, "movie not found", http.StatusNotFound)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "movie not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "error loading movie", http.StatusInternalServerError)
+		}
 		return
 	}
 	thumb, err := movie.GetThumbnail()
 	if err != nil {
-		http.Error(w, "thumbnail not found", http.StatusNotFound)
+		// errors.Is (not ==) because store.Thumbnail wraps sql.ErrNoRows with %w.
+		if errors.Is(err, sql.ErrNoRows) { // no thumbnail in DB → 404
+			http.Error(w, "movie thumbnail not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "error fetching movie thumbnail", http.StatusInternalServerError)
+		}
 		return
 	}
 	h.serveDerivative(w, r, thumb)

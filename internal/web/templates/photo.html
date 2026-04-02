@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>{{if .Photo.Title}}{{.Photo.Title}}{{else}}Photo{{end}}</title>
+  <title>{{.DisplayTitle}}</title>
   <style>
     body { font-family: sans-serif; max-width: 1200px; margin: 0 auto; padding: 1rem; }
     h1 { margin-bottom: 0.25rem; }
@@ -23,17 +23,23 @@
 </nav>
 {{end}}
 
-<h1>{{if .Photo.Title}}{{.Photo.Title}}{{else}}{{.Photo.PathComponent}}{{end}}</h1>
+<h1>{{.DisplayTitle}}</h1>
 
 <p class="meta">
   {{.Photo.Width}}&times;{{.Photo.Height}} &middot; {{.Photo.MimeType}} &middot; {{.Photo.FileSize}} bytes
-  {{if not .Photo.OriginatedAt.IsZero}} &middot; {{.Photo.OriginatedAt.Format "2006-01-02"}}{{end}}
+  {{if not (.Photo.OriginatedAt.IsZero)}} &middot; {{.Photo.OriginatedAt.Format "2006-01-02"}}{{end}}
 </p>
 
 {{if .Photo.Description}}<p class="description">{{.Photo.Description}}</p>{{end}}
 
 <div class="photo-wrap">
-  <img src="/files/{{.DiskPath}}" alt="{{.Photo.Title}}">
+  {{if .ResizedPath}}
+    <a href="/files/{{.DiskPath}}" title="View full size">
+      <img src="/files/{{.ResizedPath}}" alt="{{.DisplayTitle}}">
+    </a>
+  {{else}}
+    <img src="/files/{{.DiskPath}}" alt="{{.DisplayTitle}}">
+  {{end}}
 </div>
 
 </body>
