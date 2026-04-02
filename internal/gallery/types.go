@@ -22,6 +22,7 @@ type Album struct {
 	Keywords       string
 	Summary        string
 	PathComponent  string // directory name on disk; NULL for root (ID 7)
+	CoverPhotoID   int    // ID of the first photo in this album; 0 if album has no photos
 	OrderBy        string
 	OrderDirection string
 	CreatedAt      time.Time

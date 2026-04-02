@@ -205,6 +205,17 @@ SELECT
     COALESCE(i.g_keywords, '')        AS keywords,
     COALESCE(i.g_summary, '')         AS summary,
     COALESCE(fse.g_pathComponent, '') AS path_component,
+    COALESCE(
+        (SELECT ce2.g_id
+         FROM g2_ChildEntity ce2
+         JOIN g2_Entity e2 ON e2.g_id = ce2.g_id
+         JOIN g2_Item i2   ON i2.g_id = ce2.g_id
+         WHERE ce2.g_parentId = e.g_id
+           AND e2.g_entityType = 'GalleryPhotoItem'
+         ORDER BY i2.g_originationTimestamp, i2.g_title
+         LIMIT 1),
+        0
+    )                                 AS cover_photo_id,
     COALESCE(ai.g_orderBy, '')        AS order_by,
     COALESCE(ai.g_orderDirection, '') AS order_direction,
     e.g_creationTimestamp             AS created_at,
@@ -224,6 +235,7 @@ type albumRow struct {
 	Keywords       string `db:"keywords"`
 	Summary        string `db:"summary"`
 	PathComponent  string `db:"path_component"`
+	CoverPhotoID   int    `db:"cover_photo_id"`
 	OrderBy        string `db:"order_by"`
 	OrderDirection string `db:"order_direction"`
 	CreatedAt      int64  `db:"created_at"`
@@ -241,6 +253,7 @@ func (r albumRow) toAlbum(reader Reader) Album {
 		Keywords:       r.Keywords,
 		Summary:        r.Summary,
 		PathComponent:  r.PathComponent,
+		CoverPhotoID:   r.CoverPhotoID,
 		OrderBy:        r.OrderBy,
 		OrderDirection: r.OrderDirection,
 		CreatedAt:      time.Unix(r.CreatedAt, 0),

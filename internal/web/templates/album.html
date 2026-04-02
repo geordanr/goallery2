@@ -11,7 +11,8 @@
     section { margin-bottom: 2rem; }
     h2 { border-bottom: 1px solid #ccc; padding-bottom: 0.25rem; }
     ul.albums { list-style: none; padding: 0; }
-    ul.albums li { margin: 0.4rem 0; }
+    ul.albums li { margin: 0.4rem 0; display: flex; align-items: center; gap: 0.5rem; }
+    ul.albums li img { width: 48px; height: 48px; object-fit: cover; flex-shrink: 0; }
     .grid { display: flex; flex-wrap: wrap; gap: 0.75rem; }
     .grid-item { text-align: center; font-size: 0.85rem; }
     .grid-item a { text-decoration: none; color: inherit; }
@@ -39,7 +40,10 @@
   <h2>Albums</h2>
   <ul class="albums">
     {{range .ChildAlbums}}
-    <li><a href="/album/{{.ID}}">{{if .Title}}{{.Title}}{{else}}(untitled){{end}}</a></li>
+    <li>
+      {{if .CoverPhotoID}}<img src="/thumbnail/{{.CoverPhotoID}}" alt="" onerror="this.remove()">{{end}}
+      <a href="/album/{{.ID}}">{{if .Title}}{{.Title}}{{else}}(untitled){{end}}</a>
+    </li>
     {{end}}
   </ul>
 </section>
@@ -68,7 +72,7 @@
     {{range .Movies}}
     <div class="grid-item">
       <a href="/movie/{{.ID}}">
-        <img src="/movie/{{.ID}}/thumbnail" alt="{{if .Title}}{{.Title}}{{else}}{{.PathComponent}}{{end}}" onerror="this.style.display='none'">
+        <img src="/movie/{{.ID}}/thumbnail" alt="{{if .Title}}{{.Title}}{{else}}{{.PathComponent}}{{end}}" onerror="this.remove()">
         <span class="label">{{if .Title}}{{.Title}}{{else}}{{.PathComponent}}{{end}}</span>
       </a>
     </div>

@@ -71,6 +71,27 @@ func (h *handler) movieThumbnail(w http.ResponseWriter, r *http.Request) {
 	h.serveDerivative(w, r, thumb)
 }
 
+// thumbnail serves the thumbnail derivative for any item (photo, movie, or album
+// highlight) by ID, without needing to know the entity type.
+func (h *handler) thumbnail(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	thumb, err := h.store.Thumbnail(id)
+	if err != nil {
+		// errors.Is (not ==) because store.Thumbnail wraps sql.ErrNoRows with %w.
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "thumbnail not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "error fetching thumbnail", http.StatusInternalServerError)
+		}
+		return
+	}
+	h.serveDerivative(w, r, thumb)
+}
+
 // serveDerivative resolves the derivative's cache path under DataDir and
 // streams it with the MIME type from the DB. The .dat extension on cache files
 // is meaningless, so we set Content-Type explicitly rather than letting

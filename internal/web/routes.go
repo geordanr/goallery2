@@ -26,6 +26,7 @@ func RegisterRoutes(r *chi.Mux, db *sqlx.DB, cfg config.Config) error {
 	r.Get("/", h.index)
 	r.Get("/album/{id}", h.album)
 	r.Get("/photo/{id}", h.photo)
+	r.Get("/thumbnail/{id}", h.thumbnail)
 	r.Get("/photo/{id}/thumbnail", h.photoThumbnail)
 	r.Get("/movie/{id}", h.movie)
 	r.Get("/movie/{id}/thumbnail", h.movieThumbnail)

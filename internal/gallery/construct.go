@@ -55,6 +55,7 @@ type AlbumFields struct {
 	Keywords       string
 	Summary        string
 	PathComponent  string
+	CoverPhotoID   int
 	OrderBy        string
 	OrderDirection string
 	CreatedAt      time.Time
@@ -73,6 +74,7 @@ func NewAlbum(r Reader, f AlbumFields) *Album {
 		Keywords:       f.Keywords,
 		Summary:        f.Summary,
 		PathComponent:  f.PathComponent,
+		CoverPhotoID:   f.CoverPhotoID,
 		OrderBy:        f.OrderBy,
 		OrderDirection: f.OrderDirection,
 		CreatedAt:      f.CreatedAt,
