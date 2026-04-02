@@ -13,6 +13,7 @@
 - **Photo resized derivative** — Photo detail page shows resized image when available. Handler stats each candidate on disk before linking; falls back to full-size if cache file is missing (Gallery 2 sometimes writes DB records without generating the file).
 - **Album cover thumbnail** — Album listing shows a 48×48 cover image per child album via a correlated subquery picking the first photo by origination timestamp. Generic `/thumbnail/{id}` route serves any item's thumbnail without knowing its entity type.
 - **Prev/next navigation** — Photo detail page shows ← Previous / Next → links based on sibling order within the album. Fails gracefully if siblings can't be loaded.
+- **Sort order** — Album listing supports `?sort=date|title|modified` via a sort bar; `SortOrder` type with `String()` + `orderByClause()` keeps SQL fragments hardcoded and never user-derived.
 
 ---
 
@@ -22,15 +23,11 @@
 
 Investigate whether derivatives exist for movies in the DB. If so, serve them through the existing derivative path; if not, decide on a fallback.
 
-### 2. Sort order
+### 2. Pagination
 
-Extend album/photo listings to support sorting by title (current default), creation date, and last-modified date.
+Show N items per page on album listings.
 
-### 3. Pagination
-
-Show N items per page on album listings. Depends on stable sort order (§2) so page boundaries are consistent.
-
-### 4. Tests
+### 3. Tests
 
 #### `internal/config`
 
@@ -68,7 +65,7 @@ HTTP handler tests using `net/http/httptest`. The handlers depend on `gallery.Re
 - `TestServeFile_NotFound` — nonexistent path; verify 404
 - `TestServeFile_Directory` — path resolves to a directory; verify 404
 
-### 5. Flickr export / upload (`cmd/flickr_upload`)
+### 4. Flickr export / upload (`cmd/flickr_upload`)
 
 A standalone binary that walks albums and uploads photos and movies to Flickr using the [Flickr upload API](https://www.flickr.com/services/api/upload.api.html). Items are uploaded as private. Preserve as much Gallery 2 metadata as possible (title, description/caption, tags, date taken).
 
@@ -81,7 +78,7 @@ Design notes:
 - Respect Flickr rate limits; log progress per item
 - `cmd/flickr_upload` takes `-config` (same TOML as the server) plus Flickr-specific flags (`-flickr-key`, `-flickr-secret`, `-flickr-token`, `-flickr-token-secret`)
 
-### 6. gRPC / protobuf interface (future)
+### 5. gRPC / protobuf interface (future)
 
 A secondary read-only interface for mobile clients. Design notes:
 
