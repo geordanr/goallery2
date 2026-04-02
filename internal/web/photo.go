@@ -20,6 +20,8 @@ type photoData struct {
 	ResizedPath  string // non-empty when a resized derivative exists; use /files/ResizedPath
 	DisplayTitle string // Photo.Title if set, otherwise Photo.PathComponent
 	Breadcrumbs  []breadcrumb
+	PrevPhotoID  int // 0 if this is the first photo in the album
+	NextPhotoID  int // 0 if this is the last photo in the album
 }
 
 func (h *handler) photo(w http.ResponseWriter, r *http.Request) {
@@ -71,12 +73,39 @@ func (h *handler) photo(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Load sibling photos for prev/next navigation. Failure degrades gracefully
+	// — the photo page still renders, just without navigation links.
+	var prevPhotoID, nextPhotoID int
+	siblings, navErr := h.store.AlbumPhotos(photo.ParentID)
+	if navErr != nil {
+		slog.Warn("could not load sibling photos for navigation", "photo_id", id, "err", navErr)
+	} else {
+		var found bool
+		for i, s := range siblings {
+			if s.ID == id {
+				found = true
+				if i > 0 {
+					prevPhotoID = siblings[i-1].ID
+				}
+				if i < len(siblings)-1 {
+					nextPhotoID = siblings[i+1].ID
+				}
+				break
+			}
+		}
+		if !found && len(siblings) > 0 {
+			slog.Warn("photo not found among its album siblings", "photo_id", id, "parent_id", photo.ParentID)
+		}
+	}
+
 	data := photoData{
 		Photo:        photo,
 		DiskPath:     diskPath,
 		ResizedPath:  resizedPath,
 		DisplayTitle: photo.DisplayTitle(),
 		Breadcrumbs:  breadcrumbs,
+		PrevPhotoID:  prevPhotoID,
+		NextPhotoID:  nextPhotoID,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

@@ -10,6 +10,7 @@
     .description { margin-bottom: 1.5rem; }
     .photo-wrap { margin-bottom: 1.5rem; }
     .photo-wrap img { max-width: 100%; height: auto; display: block; }
+    .photo-nav { display: flex; justify-content: space-between; margin-top: 1rem; }
   </style>
 </head>
 <body>
@@ -41,6 +42,13 @@
     <img src="/files/{{.DiskPath}}" alt="{{.DisplayTitle}}">
   {{end}}
 </div>
+
+{{if or .PrevPhotoID .NextPhotoID}}
+<nav class="photo-nav">
+  <span>{{if .PrevPhotoID}}<a href="/photo/{{.PrevPhotoID}}">&larr; Previous</a>{{end}}</span>
+  <span>{{if .NextPhotoID}}<a href="/photo/{{.NextPhotoID}}">Next &rarr;</a>{{end}}</span>
+</nav>
+{{end}}
 
 </body>
 </html>
