@@ -56,7 +56,9 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	web.RegisterRoutes(r, database, cfg)
+	if err := web.RegisterRoutes(r, database, cfg); err != nil {
+		log.Fatalf("failed to register routes: %v", err)
+	}
 
 	slog.Info("listening", "addr", cfg.Server.Addr)
 	if err := http.ListenAndServe(cfg.Server.Addr, r); err != nil {

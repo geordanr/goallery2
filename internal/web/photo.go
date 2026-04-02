@@ -5,6 +5,8 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -56,9 +58,17 @@ func (h *handler) photo(w http.ResponseWriter, r *http.Request) {
 	if resizedErr != nil {
 		slog.Error("could not load resized derivatives; falling back to full-size", "photo_id", id, "err", resizedErr)
 	}
+	// Find the first resized derivative whose cache file actually exists on disk.
+	// Gallery 2 sometimes writes a DB record without generating the cache file.
 	var resizedPath string
-	if resizedErr == nil && len(resized) > 0 {
-		resizedPath = resized[0].CachePath()
+	if resizedErr == nil {
+		for _, d := range resized {
+			candidate := filepath.Join(h.absDataDir, filepath.FromSlash(d.CachePath()))
+			if _, err := os.Stat(candidate); err == nil {
+				resizedPath = d.CachePath()
+				break
+			}
+		}
 	}
 
 	data := photoData{

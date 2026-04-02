@@ -8,8 +8,9 @@ import (
 )
 
 type handler struct {
-	store  gallery.Reader
-	config config.Config
+	store      gallery.Reader
+	config     config.Config
+	absDataDir string // filepath.Abs(config.Server.DataDir), resolved once at construction
 }
 
 func (h *handler) index(w http.ResponseWriter, r *http.Request) {

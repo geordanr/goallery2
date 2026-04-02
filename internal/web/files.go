@@ -11,25 +11,15 @@ import (
 )
 
 func (h *handler) serveFile(w http.ResponseWriter, r *http.Request) {
-	// Resolve the data directory to an absolute path so that symlinks and
-	// relative paths in the config cannot bypass the traversal check below.
-	absDataDir, err := filepath.Abs(h.config.Server.DataDir)
-	if err != nil {
-		http.Error(w, "server configuration error", http.StatusInternalServerError)
-		return
-	}
-
-	// {path...} captures everything after /files/ as a single value, including
-	// slashes — e.g. /files/foo/bar/image.jpg → "foo/bar/image.jpg".
 	rawPath := chi.URLParam(r, "*")
 
 	// Join and clean to collapse any ".." components, then confirm the result
-	// still lives under absDataDir. This prevents path traversal attacks.
-	target := filepath.Clean(filepath.Join(absDataDir, filepath.FromSlash(rawPath)))
+	// still lives under h.absDataDir. This prevents path traversal attacks.
+	target := filepath.Clean(filepath.Join(h.absDataDir, filepath.FromSlash(rawPath)))
 
 	slog.Debug("serveFile", "raw_path", rawPath, "target", target)
 
-	if !strings.HasPrefix(target, absDataDir+string(filepath.Separator)) {
+	if !strings.HasPrefix(target, h.absDataDir+string(filepath.Separator)) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}

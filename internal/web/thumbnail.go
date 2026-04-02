@@ -76,17 +76,11 @@ func (h *handler) movieThumbnail(w http.ResponseWriter, r *http.Request) {
 // is meaningless, so we set Content-Type explicitly rather than letting
 // http.ServeFile infer it from the filename.
 func (h *handler) serveDerivative(w http.ResponseWriter, r *http.Request, d *gallery.Derivative) {
-	absDataDir, err := filepath.Abs(h.config.Server.DataDir)
-	if err != nil {
-		http.Error(w, "server configuration error", http.StatusInternalServerError)
-		return
-	}
-
-	target := filepath.Clean(filepath.Join(absDataDir, filepath.FromSlash(d.CachePath())))
+	target := filepath.Clean(filepath.Join(h.absDataDir, filepath.FromSlash(d.CachePath())))
 
 	slog.Debug("serveDerivative", "target", target)
 
-	if !strings.HasPrefix(target, absDataDir+string(filepath.Separator)) {
+	if !strings.HasPrefix(target, h.absDataDir+string(filepath.Separator)) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
