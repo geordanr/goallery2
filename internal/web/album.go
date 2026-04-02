@@ -10,6 +10,19 @@ import (
 	"github.com/geordanr/goallery2/internal/gallery"
 )
 
+// parseSortOrder maps a URL query value ("title", "modified") to a SortOrder.
+// Unknown or missing values default to SortByDate.
+func parseSortOrder(s string) gallery.SortOrder {
+	switch s {
+	case "title":
+		return gallery.SortByTitle
+	case "modified":
+		return gallery.SortByModified
+	default:
+		return gallery.SortByDate
+	}
+}
+
 type breadcrumb struct {
 	ID    int
 	Title string
@@ -21,6 +34,7 @@ type albumData struct {
 	Photos      []gallery.Photo
 	Movies      []gallery.Movie
 	Breadcrumbs []breadcrumb
+	SortKey     string // current sort query param value: "date" | "title" | "modified"
 }
 
 func (h *handler) album(w http.ResponseWriter, r *http.Request) {
@@ -36,19 +50,21 @@ func (h *handler) album(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	childAlbums, err := album.GetChildAlbums()
+	sortOrder := parseSortOrder(r.URL.Query().Get("sort"))
+
+	childAlbums, err := album.GetChildAlbums(sortOrder)
 	if err != nil {
 		http.Error(w, "error loading albums", http.StatusInternalServerError)
 		return
 	}
 
-	photos, err := album.GetPhotos()
+	photos, err := album.GetPhotos(sortOrder)
 	if err != nil {
 		http.Error(w, "error loading photos", http.StatusInternalServerError)
 		return
 	}
 
-	movies, err := album.GetMovies()
+	movies, err := album.GetMovies(sortOrder)
 	if err != nil {
 		http.Error(w, "error loading movies", http.StatusInternalServerError)
 		return
@@ -66,6 +82,7 @@ func (h *handler) album(w http.ResponseWriter, r *http.Request) {
 		Photos:      photos,
 		Movies:      movies,
 		Breadcrumbs: breadcrumbs,
+		SortKey:     sortOrder.String(),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

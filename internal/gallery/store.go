@@ -20,9 +20,9 @@ type Reader interface {
 	GetAlbum(id int) (*Album, error)
 	GetPhoto(id int) (*Photo, error)
 	GetMovie(id int) (*Movie, error)
-	ChildAlbums(parentID int) ([]Album, error)
-	AlbumPhotos(albumID int) ([]Photo, error)
-	AlbumMovies(albumID int) ([]Movie, error)
+	ChildAlbums(parentID int, sort SortOrder) ([]Album, error)
+	AlbumPhotos(albumID int, sort SortOrder) ([]Photo, error)
+	AlbumMovies(albumID int, sort SortOrder) ([]Movie, error)
 	Derivatives(sourceID int) ([]Derivative, error)
 	Thumbnail(sourceID int) (*Derivative, error)
 	ItemPath(id int) (string, error)
@@ -83,9 +83,9 @@ func (s *Store) GetMovie(id int) (*Movie, error) {
 // ── query methods ─────────────────────────────────────────────────────────────
 
 // ChildAlbums returns all direct child albums of the given parent album.
-func (s *Store) ChildAlbums(parentID int) ([]Album, error) {
+func (s *Store) ChildAlbums(parentID int, sort SortOrder) ([]Album, error) {
 	var rows []albumRow
-	err := s.db.Select(&rows, albumSelect+` WHERE ce.g_parentId = ? ORDER BY i.g_title`, parentID)
+	err := s.db.Select(&rows, albumSelect+` WHERE ce.g_parentId = ? ORDER BY `+sort.orderByClause(), parentID)
 	if err != nil {
 		return nil, fmt.Errorf("child albums for parent %d: %w", parentID, err)
 	}
@@ -97,9 +97,9 @@ func (s *Store) ChildAlbums(parentID int) ([]Album, error) {
 }
 
 // AlbumPhotos returns all photos in the given album.
-func (s *Store) AlbumPhotos(albumID int) ([]Photo, error) {
+func (s *Store) AlbumPhotos(albumID int, sort SortOrder) ([]Photo, error) {
 	var rows []photoRow
-	err := s.db.Select(&rows, photoSelect+` WHERE ce.g_parentId = ? ORDER BY i.g_originationTimestamp, i.g_title`, albumID)
+	err := s.db.Select(&rows, photoSelect+` WHERE ce.g_parentId = ? ORDER BY `+sort.orderByClause(), albumID)
 	if err != nil {
 		return nil, fmt.Errorf("photos for album %d: %w", albumID, err)
 	}
@@ -111,9 +111,9 @@ func (s *Store) AlbumPhotos(albumID int) ([]Photo, error) {
 }
 
 // AlbumMovies returns all movies in the given album.
-func (s *Store) AlbumMovies(albumID int) ([]Movie, error) {
+func (s *Store) AlbumMovies(albumID int, sort SortOrder) ([]Movie, error) {
 	var rows []movieRow
-	err := s.db.Select(&rows, movieSelect+` WHERE ce.g_parentId = ? ORDER BY i.g_originationTimestamp, i.g_title`, albumID)
+	err := s.db.Select(&rows, movieSelect+` WHERE ce.g_parentId = ? ORDER BY `+sort.orderByClause(), albumID)
 	if err != nil {
 		return nil, fmt.Errorf("movies for album %d: %w", albumID, err)
 	}

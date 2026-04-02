@@ -23,13 +23,19 @@ type fakeReader struct {
 	resized []gallery.Derivative
 }
 
-func (f *fakeReader) GetRootAlbum() (*gallery.Album, error)           { return f.album, nil }
-func (f *fakeReader) GetAlbum(_ int) (*gallery.Album, error)          { return f.album, nil }
-func (f *fakeReader) GetPhoto(_ int) (*gallery.Photo, error)          { return f.photo, nil }
-func (f *fakeReader) GetMovie(_ int) (*gallery.Movie, error)          { panic("not implemented") }
-func (f *fakeReader) ChildAlbums(_ int) ([]gallery.Album, error)      { panic("not implemented") }
-func (f *fakeReader) AlbumPhotos(_ int) ([]gallery.Photo, error)      { return f.photos, nil }
-func (f *fakeReader) AlbumMovies(_ int) ([]gallery.Movie, error)      { panic("not implemented") }
+func (f *fakeReader) GetRootAlbum() (*gallery.Album, error)  { return f.album, nil }
+func (f *fakeReader) GetAlbum(_ int) (*gallery.Album, error) { return f.album, nil }
+func (f *fakeReader) GetPhoto(_ int) (*gallery.Photo, error) { return f.photo, nil }
+func (f *fakeReader) GetMovie(_ int) (*gallery.Movie, error) { panic("not implemented") }
+func (f *fakeReader) ChildAlbums(_ int, _ gallery.SortOrder) ([]gallery.Album, error) {
+	panic("not implemented")
+}
+func (f *fakeReader) AlbumPhotos(_ int, _ gallery.SortOrder) ([]gallery.Photo, error) {
+	return f.photos, nil
+}
+func (f *fakeReader) AlbumMovies(_ int, _ gallery.SortOrder) ([]gallery.Movie, error) {
+	panic("not implemented")
+}
 func (f *fakeReader) Derivatives(_ int) ([]gallery.Derivative, error) { return f.resized, nil }
 func (f *fakeReader) Thumbnail(_ int) (*gallery.Derivative, error)    { panic("not implemented") }
 func (f *fakeReader) ItemPath(_ int) (string, error)                  { return "albums/test/photo.jpg", nil }

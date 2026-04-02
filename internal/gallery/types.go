@@ -2,6 +2,43 @@ package gallery
 
 import "time"
 
+// SortOrder controls the ORDER BY clause used when listing photos, movies, and albums.
+type SortOrder int
+
+const (
+	// SortByDate orders by origination timestamp then title. This is the default.
+	SortByDate SortOrder = iota
+	// SortByTitle orders alphabetically by title.
+	SortByTitle
+	// SortByModified orders by last-modified timestamp then title.
+	SortByModified
+)
+
+// String returns the canonical URL query value for this sort order.
+func (s SortOrder) String() string {
+	switch s {
+	case SortByTitle:
+		return "title"
+	case SortByModified:
+		return "modified"
+	default:
+		return "date"
+	}
+}
+
+// orderByClause returns a safe SQL ORDER BY expression for this sort order.
+// The returned string contains only hardcoded column references — never user input.
+func (s SortOrder) orderByClause() string {
+	switch s {
+	case SortByTitle:
+		return "i.g_title"
+	case SortByModified:
+		return "e.g_modificationTimestamp, i.g_title"
+	default: // SortByDate
+		return "i.g_originationTimestamp, i.g_title"
+	}
+}
+
 // DerivativeType corresponds to g2_Derivative.g_derivativeType.
 type DerivativeType int
 

@@ -76,7 +76,7 @@ func (h *handler) photo(w http.ResponseWriter, r *http.Request) {
 	// Load sibling photos for prev/next navigation. Failure degrades gracefully
 	// — the photo page still renders, just without navigation links.
 	var prevPhotoID, nextPhotoID int
-	siblings, navErr := h.store.AlbumPhotos(photo.ParentID)
+	siblings, navErr := h.store.AlbumPhotos(photo.ParentID, gallery.SortByDate)
 	if navErr != nil {
 		slog.Warn("could not load sibling photos for navigation", "photo_id", id, "err", navErr)
 	} else {

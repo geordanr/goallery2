@@ -18,6 +18,9 @@
     .grid-item a { text-decoration: none; color: inherit; }
     .grid-item img { display: block; max-width: 150px; max-height: 150px; }
     .grid-item .label { margin-top: 0.25rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sort-bar { font-size: 0.85rem; color: #666; margin-bottom: 1rem; }
+    .sort-bar a { margin: 0 0.25rem; }
+    .sort-bar .active { font-weight: bold; color: #333; }
   </style>
 </head>
 <body>
@@ -34,6 +37,14 @@
 <h1>{{if .Album.Title}}{{.Album.Title}}{{else}}Albums{{end}}</h1>
 
 {{if .Album.Description}}<p class="description">{{.Album.Description}}</p>{{end}}
+
+{{/* Sort links use bare ?sort= and intentionally replace all query params.
+     This is safe as long as sort is the only query parameter on this page. */}}
+<p class="sort-bar">Sort:
+  {{if eq .SortKey "date"}}<span class="active">Date</span>{{else}}<a href="?sort=date">Date</a>{{end}} &middot;
+  {{if eq .SortKey "title"}}<span class="active">Title</span>{{else}}<a href="?sort=title">Title</a>{{end}} &middot;
+  {{if eq .SortKey "modified"}}<span class="active">Modified</span>{{else}}<a href="?sort=modified">Modified</a>{{end}}
+</p>
 
 {{if .ChildAlbums}}
 <section>
