@@ -52,14 +52,6 @@ func TestPhotoHandler_ResizedMissingFromDisk(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create the full-size photo file so ItemPath resolves to something real.
-	if err := os.MkdirAll(filepath.Join(dataDir, "albums", "test"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dataDir, "albums", "test", "photo.jpg"), []byte("fake jpeg"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
 	reader := &fakeReader{}
 	reader.album = gallery.NewAlbum(reader, gallery.AlbumFields{
 		ID: 7, Title: "Root",

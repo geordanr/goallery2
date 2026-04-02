@@ -57,7 +57,7 @@ func main() {
 	r.Use(middleware.Recoverer)
 
 	if err := web.RegisterRoutes(r, database, cfg); err != nil {
-		log.Fatalf("failed to register routes: %v", err)
+		log.Fatalf("failed to register routes: %v\n  check that -data-dir or config [server] data_dir is set to an accessible directory", err)
 	}
 
 	slog.Info("listening", "addr", cfg.Server.Addr)
