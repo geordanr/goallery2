@@ -10,36 +10,33 @@
 - **Thumbnail serving** — `Derivative.CachePath()` confirmed against real data; thumbnails and full images serving correctly
 - **Movie playback** — 206 Partial Content is correct range-request behavior. Real issue: `.avi`/`.mov` not natively browser-playable. Fixed `<source type="">` placement; added download link fallback.
 - **SQL layer** — Stayed with sqlx. Introduced `gallery.Reader` interface; domain types hold `Reader` instead of `*Store`; `internal/web` decoupled from concrete implementation.
+- **Photo resized derivative** — Photo detail page shows resized image when available. Handler stats each candidate on disk before linking; falls back to full-size if cache file is missing (Gallery 2 sometimes writes DB records without generating the file).
 
 ---
 
 ## Next up
 
-### 1. Photo thumbnail on photo detail page
-
-The photo detail page currently shows the full-size image directly. Add a resized derivative to the photo detail view if one exists (`GetResized()`).
-
-### 2. Movie thumbnails
+### 1. Movie thumbnails
 
 Investigate whether derivatives exist for movies in the DB. If so, serve them through the existing derivative path; if not, decide on a fallback.
 
-### 3. Album thumbnail / cover image
+### 2. Album thumbnail / cover image
 
 Gallery 2 albums can have a highlight image. Add `g2_AlbumItem.g_highlightId` to the album query and show a cover thumbnail on the album listing page.
 
-### 4. Previous / next links in photo view
+### 3. Previous / next links in photo view
 
 Add previous/next navigation links on the photo detail page. Requires the store to return an ordered list of photos for an album so adjacent IDs can be looked up.
 
-### 5. Sort order
+### 4. Sort order
 
-Extend album/photo listings to support sorting by title (current default), creation date, and last-modified date. Build on the ordered list introduced in §4.
+Extend album/photo listings to support sorting by title (current default), creation date, and last-modified date. Build on the ordered list introduced in §3.
 
-### 6. Pagination
+### 5. Pagination
 
-Show N items per page on album listings. Depends on stable sort order (§5) so page boundaries are consistent.
+Show N items per page on album listings. Depends on stable sort order (§4) so page boundaries are consistent.
 
-### 7. Tests
+### 6. Tests
 
 #### `internal/config`
 
@@ -77,7 +74,7 @@ HTTP handler tests using `net/http/httptest`. The handlers depend on `gallery.Re
 - `TestServeFile_NotFound` — nonexistent path; verify 404
 - `TestServeFile_Directory` — path resolves to a directory; verify 404
 
-### 8. Flickr export / upload (`cmd/flickr_upload`)
+### 7. Flickr export / upload (`cmd/flickr_upload`)
 
 A standalone binary that walks albums and uploads photos and movies to Flickr using the [Flickr upload API](https://www.flickr.com/services/api/upload.api.html). Items are uploaded as private. Preserve as much Gallery 2 metadata as possible (title, description/caption, tags, date taken).
 
@@ -90,7 +87,7 @@ Design notes:
 - Respect Flickr rate limits; log progress per item
 - `cmd/flickr_upload` takes `-config` (same TOML as the server) plus Flickr-specific flags (`-flickr-key`, `-flickr-secret`, `-flickr-token`, `-flickr-token-secret`)
 
-### 9. gRPC / protobuf interface (future)
+### 8. gRPC / protobuf interface (future)
 
 A secondary read-only interface for mobile clients. Design notes:
 

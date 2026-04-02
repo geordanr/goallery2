@@ -34,7 +34,7 @@
 {{if .Movie.Description}}<p class="description">{{.Movie.Description}}</p>{{end}}
 
 <div class="movie-wrap">
-  <video controls>
+  <video controls poster="/movie/{{.Movie.ID}}/thumbnail">
     <source src="/files/{{.DiskPath}}" type="{{.Movie.MimeType}}">
     Your browser does not support this video format.
   </video>

@@ -68,6 +68,7 @@
     {{range .Movies}}
     <div class="grid-item">
       <a href="/movie/{{.ID}}">
+        <img src="/movie/{{.ID}}/thumbnail" alt="{{if .Title}}{{.Title}}{{else}}{{.PathComponent}}{{end}}" onerror="this.style.display='none'">
         <span class="label">{{if .Title}}{{.Title}}{{else}}{{.PathComponent}}{{end}}</span>
       </a>
     </div>
