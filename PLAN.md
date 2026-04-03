@@ -15,16 +15,13 @@
 - **Prev/next navigation** — Photo detail page shows ← Previous / Next → links based on sibling order within the album. Fails gracefully if siblings can't be loaded.
 - **Sort order** — Album listing supports `?sort=date|title|modified` via a sort bar; `SortOrder` type with `String()` + `orderByClause()` keeps SQL fragments hardcoded and never user-derived.
 - **Movie thumbnails** — Album listing shows movie thumbnails via `/movie/{id}/thumbnail`; movie detail page sets `poster=` on the `<video>` element. `onerror="this.remove()"` handles missing thumbnails gracefully.
+- **Pagination** — Album photo grid paginates at 50 per page. Page links carry sort; sort links reset to page 1. Invalid/out-of-range `?page=` silently clamps to 1.
 
 ---
 
 ## Next up
 
-### 1. Pagination
-
-Show N items per page on album listings.
-
-### 2. Tests
+### 1. Tests
 
 #### `internal/config`
 
@@ -62,7 +59,7 @@ HTTP handler tests using `net/http/httptest`. The handlers depend on `gallery.Re
 - `TestServeFile_NotFound` — nonexistent path; verify 404
 - `TestServeFile_Directory` — path resolves to a directory; verify 404
 
-### 3. Flickr export / upload (`cmd/flickr_upload`)
+### 2. Flickr export / upload (`cmd/flickr_upload`)
 
 A standalone binary that walks albums and uploads photos and movies to Flickr using the [Flickr upload API](https://www.flickr.com/services/api/upload.api.html). Items are uploaded as private. Preserve as much Gallery 2 metadata as possible (title, description/caption, tags, date taken).
 
@@ -75,7 +72,7 @@ Design notes:
 - Respect Flickr rate limits; log progress per item
 - `cmd/flickr_upload` takes `-config` (same TOML as the server) plus Flickr-specific flags (`-flickr-key`, `-flickr-secret`, `-flickr-token`, `-flickr-token-secret`)
 
-### 4. gRPC / protobuf interface (future)
+### 3. gRPC / protobuf interface (future)
 
 A secondary read-only interface for mobile clients. Design notes:
 
