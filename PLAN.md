@@ -37,16 +37,21 @@ Integration tests against a real MySQL instance. The Gallery 2 schema is fixed a
 
 ### 2. Flickr export / upload (`cmd/flickr_upload`)
 
-A standalone binary that walks albums and uploads photos and movies to Flickr using the [Flickr upload API](https://www.flickr.com/services/api/upload.api.html). Items are uploaded as private. Preserve as much Gallery 2 metadata as possible (title, description/caption, tags, date taken).
+A standalone binary that uploads photos from selected Gallery 2 albums to Flickr. Movies are not uploaded. Photos are uploaded as private. Preserve as much Gallery 2 metadata as possible (title, description/caption, tags, date taken).
 
-Design notes:
+#### Album selection and naming
+
+- The user specifies one or more album IDs on the command line; each selected album is walked recursively, uploading all descendant photos.
+- Each album (selected or descended) becomes a Flickr photoset. Flickr photosets have no parent/child relationship, so the hierarchy is flattened.
+- To make the flat list navigable, child album titles are prefixed with their parent's title: `{parent album title} - {child album title}`. This is applied recursively, so a grandchild becomes `{grandparent} - {parent} - {child}`.
+
+#### Design notes
 
 - Reuse `gallery.Store` for all data access — no new DB queries in the upload layer
 - OAuth 1.0a flow for Flickr authentication; store credentials in a local config or env vars
-- Walk albums depth-first; create a matching Flickr photoset per album
-- Skip already-uploaded items (track by storing Flickr IDs somewhere — a local SQLite sidecar or a flat file index)
+- Skip already-uploaded items (track by storing Flickr photo/photoset IDs in a local flat file index keyed by Gallery 2 item ID)
 - Respect Flickr rate limits; log progress per item
-- `cmd/flickr_upload` takes `-config` (same TOML as the server) plus Flickr-specific flags (`-flickr-key`, `-flickr-secret`, `-flickr-token`, `-flickr-token-secret`)
+- `cmd/flickr_upload` takes `-config` (same TOML as the server), one or more album IDs as positional arguments, plus Flickr-specific flags (`-flickr-key`, `-flickr-secret`, `-flickr-token`, `-flickr-token-secret`), `-state` (path to the progress file, default `flickr_upload.json`), and `-dryrun` (print the planned albums and photos without uploading anything)
 
 ### 3. gRPC / protobuf interface (future)
 
