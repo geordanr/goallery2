@@ -16,23 +16,13 @@
 - **Sort order** — Album listing supports `?sort=date|title|modified` via a sort bar; `SortOrder` type with `String()` + `orderByClause()` keeps SQL fragments hardcoded and never user-derived.
 - **Movie thumbnails** — Album listing shows movie thumbnails via `/movie/{id}/thumbnail`; movie detail page sets `poster=` on the `<video>` element. `onerror="this.remove()"` handles missing thumbnails gracefully.
 - **Pagination** — Album photo grid paginates at 50 per page. Page links carry sort; sort links reset to page 1. Invalid/out-of-range `?page=` silently clamps to 1.
+- **Tests** — `internal/config`: full unit test suite. `internal/web`: index redirect, album/photo 404, file-serving (OK, traversal guard, not-found, directory). Photo handler: resized fallback + prev/next nav. Album handler: pagination edge cases.
 
 ---
 
 ## Next up
 
-### 1. Tests
-
-#### `internal/config`
-
-Unit tests; no external dependencies.
-
-- `TestDefaults` — `Load("", Overrides{})` returns expected default values
-- `TestTOMLFile` — write a temp TOML file, verify fields are loaded correctly
-- `TestFlagOverrides` — TOML file sets values, overrides replace specific fields; zero-value overrides do not clobber file values
-- `TestMissingFile` — non-empty path to a nonexistent file returns an error
-
-#### `internal/gallery`
+### 1. `internal/gallery` integration tests
 
 Integration tests against a real MySQL instance. The Gallery 2 schema is fixed and read-only, so mocking the DB would hide real query errors.
 
@@ -44,20 +34,6 @@ Integration tests against a real MySQL instance. The Gallery 2 schema is fixed a
 - `TestGetPhoto` / `TestGetMovie` — known IDs, verify fields
 - `TestItemPath` — known photo ID, verify reconstructed path starts with `albums/` and uses forward slashes
 - `TestGetDerivatives` / `TestGetThumbnail` — known photo ID with derivatives
-
-#### `internal/web`
-
-HTTP handler tests using `net/http/httptest`. The handlers depend on `gallery.Reader`, so test fakes implement the interface without a real DB.
-
-- `TestIndexRedirect` — `GET /` → 302 to `/album/7`
-- `TestAlbumHandler` — fake reader returns a known album; verify status 200, template renders title and child links
-- `TestAlbumNotFound` — reader returns `sql.ErrNoRows`-wrapped error; verify 404
-- `TestPhotoHandler` / `TestMovieHandler` — similar shape
-- `TestFileRouteMatches` — verify chi `/*` wildcard matches single and multi-segment paths ✓ (done)
-- `TestServeFile_OK` — temp file under a temp data dir; verify 200 and correct content
-- `TestServeFile_Traversal` — paths like `../secret`; verify 403
-- `TestServeFile_NotFound` — nonexistent path; verify 404
-- `TestServeFile_Directory` — path resolves to a directory; verify 404
 
 ### 2. Flickr export / upload (`cmd/flickr_upload`)
 
