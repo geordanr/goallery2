@@ -21,6 +21,7 @@
     .sort-bar { font-size: 0.85rem; color: #666; margin-bottom: 1rem; }
     .sort-bar a { margin: 0 0.25rem; }
     .sort-bar .active { font-weight: bold; color: #333; }
+    .pagination { font-size: 0.85rem; margin: 1rem 0; display: flex; gap: 0.75rem; align-items: center; }
   </style>
 </head>
 <body>
@@ -38,8 +39,7 @@
 
 {{if .Album.Description}}<p class="description">{{.Album.Description}}</p>{{end}}
 
-{{/* Sort links use bare ?sort= and intentionally replace all query params.
-     This is safe as long as sort is the only query parameter on this page. */}}
+{{/* Sort links reset to page 1; page links carry the current sort. */}}
 <p class="sort-bar">Sort:
   {{if eq .SortKey "date"}}<span class="active">Date</span>{{else}}<a href="?sort=date">Date</a>{{end}} &middot;
   {{if eq .SortKey "title"}}<span class="active">Title</span>{{else}}<a href="?sort=title">Title</a>{{end}} &middot;
@@ -61,6 +61,13 @@
 {{end}}
 
 {{if .Photos}}
+{{if gt .TotalPages 1}}
+<nav class="pagination">
+  {{if .PrevPage}}<a href="?sort={{.SortKey}}&page={{.PrevPage}}">&larr; Prev</a>{{else}}<span>&larr; Prev</span>{{end}}
+  <span>Page {{.Page}} of {{.TotalPages}}</span>
+  {{if .NextPage}}<a href="?sort={{.SortKey}}&page={{.NextPage}}">Next &rarr;</a>{{else}}<span>Next &rarr;</span>{{end}}
+</nav>
+{{end}}
 <section>
   <h2>Photos</h2>
   <div class="grid">
@@ -74,6 +81,13 @@
     {{end}}
   </div>
 </section>
+{{if gt .TotalPages 1}}
+<nav class="pagination">
+  {{if .PrevPage}}<a href="?sort={{.SortKey}}&page={{.PrevPage}}">&larr; Prev</a>{{else}}<span>&larr; Prev</span>{{end}}
+  <span>Page {{.Page}} of {{.TotalPages}}</span>
+  {{if .NextPage}}<a href="?sort={{.SortKey}}&page={{.NextPage}}">Next &rarr;</a>{{else}}<span>Next &rarr;</span>{{end}}
+</nav>
+{{end}}
 {{end}}
 
 {{if .Movies}}

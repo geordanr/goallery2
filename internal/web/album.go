@@ -10,6 +10,8 @@ import (
 	"github.com/geordanr/goallery2/internal/gallery"
 )
 
+const photosPerPage = 50
+
 // parseSortOrder maps a URL query value ("title", "modified") to a SortOrder.
 // Unknown or missing values default to SortByDate.
 func parseSortOrder(s string) gallery.SortOrder {
@@ -35,6 +37,10 @@ type albumData struct {
 	Movies      []gallery.Movie
 	Breadcrumbs []breadcrumb
 	SortKey     string // current sort query param value: "date" | "title" | "modified"
+	Page        int    // current 1-indexed page number
+	TotalPages  int    // total number of photo pages
+	PrevPage    int    // previous page number; 0 if on the first page
+	NextPage    int    // next page number; 0 if on the last page
 }
 
 func (h *handler) album(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +64,7 @@ func (h *handler) album(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	photos, err := album.GetPhotos(sortOrder)
+	allPhotos, err := album.GetPhotos(sortOrder)
 	if err != nil {
 		http.Error(w, "error loading photos", http.StatusInternalServerError)
 		return
@@ -76,6 +82,24 @@ func (h *handler) album(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Paginate photos. Movies and child albums are small enough to show all at once.
+	totalPages := max(1, (len(allPhotos)+photosPerPage-1)/photosPerPage)
+	page, _ := strconv.Atoi(r.URL.Query().Get("page")) // invalid/missing → 0, clamped to 1 below
+	if page < 1 || page > totalPages {
+		page = 1
+	}
+	start := (page - 1) * photosPerPage
+	end := min(start+photosPerPage, len(allPhotos))
+	photos := allPhotos[start:end]
+
+	prevPage, nextPage := page-1, page+1
+	if page == 1 {
+		prevPage = 0
+	}
+	if page == totalPages {
+		nextPage = 0
+	}
+
 	data := albumData{
 		Album:       album,
 		ChildAlbums: childAlbums,
@@ -83,6 +107,10 @@ func (h *handler) album(w http.ResponseWriter, r *http.Request) {
 		Movies:      movies,
 		Breadcrumbs: breadcrumbs,
 		SortKey:     sortOrder.String(),
+		Page:        page,
+		TotalPages:  totalPages,
+		PrevPage:    prevPage,
+		NextPage:    nextPage,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

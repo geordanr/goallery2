@@ -17,10 +17,11 @@ import (
 // fakeReader implements gallery.Reader for handler tests. Only methods exercised
 // by the photo handler are wired up; all others panic to make accidental calls obvious.
 type fakeReader struct {
-	photo   *gallery.Photo
-	album   *gallery.Album
-	photos  []gallery.Photo // siblings returned by AlbumPhotos, for prev/next nav
-	resized []gallery.Derivative
+	photo       *gallery.Photo
+	album       *gallery.Album
+	childAlbums []gallery.Album // returned by ChildAlbums
+	photos      []gallery.Photo // siblings returned by AlbumPhotos, for prev/next nav
+	resized     []gallery.Derivative
 }
 
 func (f *fakeReader) GetRootAlbum() (*gallery.Album, error)  { return f.album, nil }
@@ -28,13 +29,13 @@ func (f *fakeReader) GetAlbum(_ int) (*gallery.Album, error) { return f.album, n
 func (f *fakeReader) GetPhoto(_ int) (*gallery.Photo, error) { return f.photo, nil }
 func (f *fakeReader) GetMovie(_ int) (*gallery.Movie, error) { panic("not implemented") }
 func (f *fakeReader) ChildAlbums(_ int, _ gallery.SortOrder) ([]gallery.Album, error) {
-	panic("not implemented")
+	return f.childAlbums, nil
 }
 func (f *fakeReader) AlbumPhotos(_ int, _ gallery.SortOrder) ([]gallery.Photo, error) {
 	return f.photos, nil
 }
 func (f *fakeReader) AlbumMovies(_ int, _ gallery.SortOrder) ([]gallery.Movie, error) {
-	panic("not implemented")
+	return nil, nil
 }
 func (f *fakeReader) Derivatives(_ int) ([]gallery.Derivative, error) { return f.resized, nil }
 func (f *fakeReader) Thumbnail(_ int) (*gallery.Derivative, error)    { panic("not implemented") }
