@@ -114,6 +114,39 @@ func (c *Client) UploadPhoto(diskPath, title, description, tags string) (string,
 	return result.PhotoID, nil
 }
 
+// CheckAuth calls flickr.test.echo to verify that the credentials are valid
+// and that signed requests reach Flickr correctly. Returns nil on success, or
+// an error describing the failure (network, signing, or API-level rejection).
+func (c *Client) CheckAuth() error {
+	// flickr.test.echo returns stat="ok" for any valid signed request; no
+	// additional payload params are needed.
+	params := map[string]string{
+		"method":  "flickr.test.echo",
+		"api_key": c.creds.APIKey,
+		"format":  "rest",
+	}
+	resp, err := c.callAPI(params)
+	if err != nil {
+		return fmt.Errorf("flickr.test.echo: %w", err)
+	}
+
+	var result struct {
+		XMLName xml.Name `xml:"rsp"`
+		Stat    string   `xml:"stat,attr"`
+		Err     struct {
+			Code string `xml:"code,attr"`
+			Msg  string `xml:"msg,attr"`
+		} `xml:"err"`
+	}
+	if err := xml.Unmarshal(resp, &result); err != nil {
+		return fmt.Errorf("parsing flickr.test.echo response: %w", err)
+	}
+	if result.Stat != "ok" {
+		return fmt.Errorf("flickr.test.echo failed (code %s): %s", result.Err.Code, result.Err.Msg)
+	}
+	return nil
+}
+
 // SetDateTaken sets the date taken on an already-uploaded photo via
 // flickr.photos.setDates. dateTaken must be non-zero.
 func (c *Client) SetDateTaken(photoID string, dateTaken time.Time) error {

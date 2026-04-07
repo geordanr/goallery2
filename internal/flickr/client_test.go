@@ -166,6 +166,39 @@ func TestCreatePhotoset_ServerError(t *testing.T) {
 	}
 }
 
+// ── CheckAuth ─────────────────────────────────────────────────────────────────
+
+func TestCheckAuth_OK(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Errorf("ParseForm: %v", err)
+		}
+		if r.FormValue("method") != "flickr.test.echo" {
+			t.Errorf("method = %q, want flickr.test.echo", r.FormValue("method"))
+		}
+		// flickr.test.echo echoes all params back inside the response XML.
+		_, _ = fmt.Fprint(w, `<?xml version="1.0" encoding="utf-8"?><rsp stat="ok"/>`)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(nil, srv)
+	if err := c.CheckAuth(); err != nil {
+		t.Fatalf("CheckAuth: %v", err)
+	}
+}
+
+func TestCheckAuth_Failure(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, errResponse("100", "Invalid API Key"))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(nil, srv)
+	if err := c.CheckAuth(); err == nil {
+		t.Fatal("expected error for invalid credentials, got nil")
+	}
+}
+
 // ── AddPhotoToPhotoset ────────────────────────────────────────────────────────
 
 func TestAddPhotoToPhotoset_OK(t *testing.T) {

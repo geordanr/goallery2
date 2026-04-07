@@ -24,10 +24,26 @@ func main() {
 	flickrTokenSecret := fs.String("flickr-token-secret", "", "Flickr OAuth token secret")
 	statePath := fs.String("state", "flickr_upload.json", "path to upload progress file")
 	dryRun := fs.Bool("dryrun", false, "print planned actions without uploading anything")
+	check := fs.Bool("check", false, "verify Flickr credentials with flickr.test.echo then exit")
 	overrides := config.RegisterFlags(fs)
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{})))
+
+	if *check {
+		requireFlickrCreds(*flickrKey, *flickrSecret, *flickrToken, *flickrTokenSecret)
+		c := flickr.NewClient(flickr.Credentials{
+			APIKey:      *flickrKey,
+			APISecret:   *flickrSecret,
+			Token:       *flickrToken,
+			TokenSecret: *flickrTokenSecret,
+		})
+		if err := c.CheckAuth(); err != nil {
+			log.Fatalf("auth check failed: %v", err)
+		}
+		slog.Info("auth check passed")
+		return
+	}
 
 	albumIDs, err := parseAlbumIDs(flag.Args())
 	if err != nil {
@@ -46,9 +62,7 @@ func main() {
 	}
 
 	if !*dryRun {
-		if *flickrKey == "" || *flickrSecret == "" || *flickrToken == "" || *flickrTokenSecret == "" {
-			log.Fatal("all four Flickr credential flags are required: -flickr-key, -flickr-secret, -flickr-token, -flickr-token-secret")
-		}
+		requireFlickrCreds(*flickrKey, *flickrSecret, *flickrToken, *flickrTokenSecret)
 	}
 
 	database, err := db.Connect(cfg.DB)
@@ -90,6 +104,12 @@ func main() {
 	}
 
 	slog.Info("done")
+}
+
+func requireFlickrCreds(key, secret, token, tokenSecret string) {
+	if key == "" || secret == "" || token == "" || tokenSecret == "" {
+		log.Fatal("all four Flickr credential flags are required: -flickr-key, -flickr-secret, -flickr-token, -flickr-token-secret")
+	}
 }
 
 func parseAlbumIDs(args []string) ([]int, error) {
