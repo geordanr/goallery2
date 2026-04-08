@@ -3,9 +3,11 @@ package config
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 
 	"github.com/BurntSushi/toml"
+	"github.com/dghubble/oauth1"
 )
 
 // Config holds all runtime configuration for goallery2.
@@ -16,8 +18,9 @@ type Config struct {
 
 // ServerConfig holds HTTP server settings.
 type ServerConfig struct {
-	Addr    string `toml:"addr"`
-	DataDir string `toml:"data_dir"`
+	Addr         string                         `toml:"addr"`
+	DataDir      string                         `toml:"data_dir"`
+	OAuthConfigs map[string]OAuthProviderConfig `toml:"oauth"`
 }
 
 // DBConfig holds MySQL connection settings.
@@ -27,6 +30,16 @@ type DBConfig struct {
 	Host     string `toml:"host"`
 	Port     int    `toml:"port"`
 	Name     string `toml:"name"`
+}
+
+// OAuthProviderConfig stores URLs and  our consumer key and secret for a given provider.
+type OAuthProviderConfig struct {
+	Key             string `toml:"key"`
+	Secret          string `toml:"secret"`
+	Callback        string `toml:"callback"`
+	AccessTokenURL  string `toml:"access_token_url"`
+	AuthorizeURL    string `toml:"authorize_url"`
+	RequestTokenURL string `toml:"request_token_url"`
 }
 
 // defaults returns a Config populated with sensible local-dev defaults.
@@ -113,4 +126,41 @@ func RegisterFlags(fs *flag.FlagSet) *Overrides {
 	fs.IntVar(&o.DBPort, "db-port", 0, "MySQL port (overrides config file)")
 	fs.StringVar(&o.DBName, "db-name", "", "MySQL database name (overrides config file)")
 	return o
+}
+
+// BaseURL returns the absolute HTTP base URL for this server derived from Addr.
+// Unspecified or wildcard hosts (e.g. ":8080", "0.0.0.0:8080") resolve to localhost.
+func (s ServerConfig) BaseURL() string {
+	host, port, err := net.SplitHostPort(s.Addr)
+	if err != nil {
+		return "http://" + s.Addr
+	}
+	if host == "" || host == "0.0.0.0" {
+		host = "localhost"
+	}
+	if port == "" {
+		return "http://" + host
+	}
+	return "http://" + host + ":" + port
+}
+
+// GetOAuthConfig creates an oauth1.Config for the given provider.
+func (c *Config) GetOAuthConfig(provider string) (oauth1.Config, error) {
+	p, ok := c.Server.OAuthConfigs[provider]
+	if !ok {
+		return oauth1.Config{}, fmt.Errorf("provider not found in config: %s", provider)
+	}
+
+	oauthConfig := oauth1.Config{
+		ConsumerKey:    p.Key,
+		ConsumerSecret: p.Secret,
+		CallbackURL:    c.Server.BaseURL() + p.Callback,
+		Endpoint: oauth1.Endpoint{
+			AccessTokenURL:  p.AccessTokenURL,
+			AuthorizeURL:    p.AuthorizeURL,
+			RequestTokenURL: p.RequestTokenURL,
+		},
+	}
+
+	return oauthConfig, nil
 }

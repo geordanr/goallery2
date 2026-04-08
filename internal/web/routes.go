@@ -31,5 +31,7 @@ func RegisterRoutes(r *chi.Mux, db *sqlx.DB, cfg config.Config) error {
 	r.Get("/movie/{id}", h.movie)
 	r.Get("/movie/{id}/thumbnail", h.movieThumbnail)
 	r.Get("/files/*", h.serveFile)
+	r.Get("/oauth/start/{provider}", h.oauth)
+	r.Get("/oauth/callback/v1/{provider}", h.oauthV1Callback)
 	return nil
 }
