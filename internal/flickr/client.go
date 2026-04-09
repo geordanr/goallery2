@@ -4,28 +4,23 @@
 package flickr
 
 import (
-	"crypto/hmac"
-	"crypto/sha1"
-	"encoding/base64"
+	"context"
 	"encoding/xml"
 	"fmt"
 	"io"
-	"math/rand"
 	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"slices"
-	"strconv"
-	"strings"
 	"time"
+
+	"github.com/dghubble/oauth1"
 )
 
 const (
-	uploadURL  = "https://up.flickr.com/services/upload/"
-	apiURL     = "https://www.flickr.com/services/rest/"
-	apiVersion = "1"
+	uploadURL = "https://up.flickr.com/services/upload/"
+	apiURL    = "https://www.flickr.com/services/rest/"
 )
 
 // Credentials holds Flickr OAuth 1.0a tokens.
@@ -46,9 +41,13 @@ type Client struct {
 
 // NewClient creates a Client with the given credentials.
 func NewClient(creds Credentials) *Client {
+	cfg := oauth1.NewConfig(creds.APIKey, creds.APISecret)
+	tok := oauth1.NewToken(creds.Token, creds.TokenSecret)
+	httpClient := cfg.Client(context.Background(), tok)
+	httpClient.Timeout = 120 * time.Second
 	return &Client{
 		creds: creds,
-		http:  &http.Client{Timeout: 120 * time.Second},
+		http:  httpClient,
 	}
 }
 
@@ -79,13 +78,13 @@ func (c *Client) UploadPhoto(diskPath, title, description, tags string) (string,
 		"is_family":   "0",
 	}
 
-	url := c.effectiveUploadURL()
-	body, contentType, err := buildUploadBody(diskPath, params, c.oauthParams("POST", url, params))
+	rawURL := c.effectiveUploadURL()
+	body, contentType, err := buildUploadBody(diskPath, params)
 	if err != nil {
 		return "", fmt.Errorf("building upload request for %q: %w", diskPath, err)
 	}
 
-	resp, err := c.http.Post(url, contentType, body) //nolint:noctx
+	resp, err := c.http.Post(rawURL, contentType, body) //nolint:noctx
 	if err != nil {
 		return "", fmt.Errorf("uploading %q: %w", diskPath, err)
 	}
@@ -281,13 +280,9 @@ func (c *Client) AddPhotoToPhotoset(photosetID, photoID string) error {
 // callAPI posts a signed REST API call and returns the raw response body.
 func (c *Client) callAPI(params map[string]string) ([]byte, error) {
 	target := c.effectiveAPIURL()
-	signed := c.oauthParams("POST", target, params)
-	for k, v := range params {
-		signed[k] = v
-	}
 
 	form := url.Values{}
-	for k, v := range signed {
+	for k, v := range params {
 		form.Set(k, v)
 	}
 
@@ -299,66 +294,14 @@ func (c *Client) callAPI(params map[string]string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-// oauthParams computes and returns a complete set of OAuth 1.0a parameters
-// (including the signature) for the given method, URL, and additional params.
-// The returned map contains only the OAuth parameters; callers must merge it
-// with the API parameters themselves.
-func (c *Client) oauthParams(method, rawURL string, extraParams map[string]string) map[string]string {
-	oauth := map[string]string{
-		"oauth_consumer_key":     c.creds.APIKey,
-		"oauth_token":            c.creds.Token,
-		"oauth_signature_method": "HMAC-SHA1",
-		"oauth_timestamp":        strconv.FormatInt(time.Now().Unix(), 10),
-		"oauth_nonce":            strconv.FormatUint(rand.Uint64(), 36), //nolint:gosec
-		"oauth_version":          apiVersion,
-	}
-
-	// Collect all params for signature base string.
-	all := make(map[string]string, len(oauth)+len(extraParams))
-	for k, v := range oauth {
-		all[k] = v
-	}
-	for k, v := range extraParams {
-		all[k] = v
-	}
-
-	oauth["oauth_signature"] = c.sign(method, rawURL, all)
-	return oauth
-}
-
-// sign computes the HMAC-SHA1 OAuth signature for the given parameters.
-func (c *Client) sign(method, rawURL string, params map[string]string) string {
-	// Sort params for deterministic signature base string.
-	keys := make([]string, 0, len(params))
-	for k := range params {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-
-	parts := make([]string, 0, len(keys))
-	for _, k := range keys {
-		parts = append(parts, url.QueryEscape(k)+"="+url.QueryEscape(params[k]))
-	}
-	paramStr := strings.Join(parts, "&")
-
-	base := strings.Join([]string{
-		url.QueryEscape(method),
-		url.QueryEscape(rawURL),
-		url.QueryEscape(paramStr),
-	}, "&")
-
-	signingKey := url.QueryEscape(c.creds.APISecret) + "&" + url.QueryEscape(c.creds.TokenSecret)
-	mac := hmac.New(sha1.New, []byte(signingKey))
-	_, _ = mac.Write([]byte(base))
-	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
-}
-
 // openFile opens the file at path for reading. Extracted so it can be
 // replaced in tests.
 var openFile = func(path string) (*os.File, error) { return os.Open(path) }
 
 // buildUploadBody constructs the multipart/form-data body for a photo upload.
-func buildUploadBody(diskPath string, params, oauthParams map[string]string) (io.Reader, string, error) {
+// OAuth credentials are sent via the Authorization header by the oauth1 transport,
+// so only API params (title, description, etc.) and the photo file are included here.
+func buildUploadBody(diskPath string, params map[string]string) (io.Reader, string, error) {
 	pr, pw := io.Pipe()
 	mw := multipart.NewWriter(pw)
 
@@ -366,12 +309,6 @@ func buildUploadBody(diskPath string, params, oauthParams map[string]string) (io
 		var closeErr error
 		defer func() { _ = pw.CloseWithError(closeErr) }()
 
-		// Write OAuth params as form fields.
-		for k, v := range oauthParams {
-			if closeErr = mw.WriteField(k, v); closeErr != nil {
-				return
-			}
-		}
 		// Write API params as form fields.
 		for k, v := range params {
 			if closeErr = mw.WriteField(k, v); closeErr != nil {

@@ -55,9 +55,6 @@ func TestUploadPhoto_OK(t *testing.T) {
 
 	// Write a temp file for the upload.
 	tmpFile := t.TempDir() + "/photo.jpg"
-	orig := openFile
-	openFile = func(path string) (*os.File, error) { return os.Open(path) }
-	t.Cleanup(func() { openFile = orig })
 	if err := os.WriteFile(tmpFile, []byte("fake jpeg"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -296,26 +293,5 @@ func TestTestLogin_Failure(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "Login failed") {
 		t.Errorf("error should contain server message; got %v", err)
-	}
-}
-
-// ── sign ──────────────────────────────────────────────────────────────────────
-
-func TestSign_Deterministic(t *testing.T) {
-	c := NewClient(Credentials{APIKey: "k", APISecret: "s", Token: "t", TokenSecret: "ts"})
-	params := map[string]string{"foo": "bar", "baz": "qux"}
-	sig1 := c.sign("POST", "https://example.com/api", params)
-	sig2 := c.sign("POST", "https://example.com/api", params)
-	if sig1 != sig2 {
-		t.Errorf("sign is not deterministic: %q vs %q", sig1, sig2)
-	}
-}
-
-func TestSign_DifferentParamsProduceDifferentSigs(t *testing.T) {
-	c := NewClient(Credentials{APIKey: "k", APISecret: "s", Token: "t", TokenSecret: "ts"})
-	sig1 := c.sign("POST", "https://example.com/api", map[string]string{"a": "1"})
-	sig2 := c.sign("POST", "https://example.com/api", map[string]string{"a": "2"})
-	if sig1 == sig2 {
-		t.Error("different params should produce different signatures")
 	}
 }
