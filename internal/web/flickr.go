@@ -25,6 +25,7 @@ func localCookie(name, value string) *http.Cookie {
 	return &http.Cookie{
 		Name:     name,
 		Domain:   "localhost",
+		Path:     "/",
 		Value:    value,
 		Expires:  time.Now().Add(time.Hour),
 		HttpOnly: true,
