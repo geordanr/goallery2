@@ -4,8 +4,8 @@
 
 ### Done
 
-- **`internal/config`** — TOML config file + CLI flag overrides; `db.Connect` takes typed `DBConfig`
-- **`internal/gallery`** — `Store` with all DB queries for albums, photos, movies, derivatives; `itemPath` walk (prepends `albums/`, joins with `/`); `Derivative.CachePath()`; lazy-load methods on domain types
+- **`internal/config`** — TOML config file + CLI flag overrides; `db.Connect` takes typed `DBConfig`; `ServerConfig.BaseURL()` derived from `Addr`; `GetOAuthConfig()` builds `oauth1.Config` per provider; `FlickrStatePath` for upload state (default `flickr_upload.json`)
+- **`internal/gallery`** — `Store` with all DB queries for albums, photos, movies, derivatives; `itemPath` walk (prepends `albums/`, joins with `/`); `Derivative.CachePath()`; lazy-load methods on domain types; `gallery.Reader` interface decouples web/upload layers from concrete DB
 - **`internal/web`** — chi router; `GET /`, `GET /album/{id}`, `GET /photo/{id}`, `GET /photo/{id}/thumbnail`, `GET /movie/{id}`, `GET /movie/{id}/thumbnail`, `GET /files/*`; embedded HTML templates; breadcrumb nav; path-traversal-safe file serving
 - **Thumbnail serving** — `Derivative.CachePath()` confirmed against real data; thumbnails and full images serving correctly
 - **Movie playback** — 206 Partial Content is correct range-request behavior. Real issue: `.avi`/`.mov` not natively browser-playable. Fixed `<source type="">` placement; added download link fallback.
@@ -17,6 +17,19 @@
 - **Movie thumbnails** — Album listing shows movie thumbnails via `/movie/{id}/thumbnail`; movie detail page sets `poster=` on the `<video>` element. `onerror="this.remove()"` handles missing thumbnails gracefully.
 - **Pagination** — Album photo grid paginates at 50 per page. Page links carry sort; sort links reset to page 1. Invalid/out-of-range `?page=` silently clamps to 1.
 - **Tests** — `internal/config`: full unit test suite. `internal/web`: index redirect, album/photo 404, file-serving (OK, traversal guard, not-found, directory). Photo handler: resized fallback + prev/next nav. Album handler: pagination edge cases.
+- **Flickr export — CLI (`cmd/flickr_upload`)** — standalone binary; walks albums recursively; uploads photos as private with title/description/tags/date-taken; resumes via JSON state file; `-dryrun`, `-check`, `-state` flags; two-phase upload (collect IDs, then create/extend photosets) handles resume correctly
+- **Flickr export — uploader package (`internal/uploader`)** — `Walk` builds flat `[]AlbumUpload` with prefixed titles; `Uploader.Run` drives upload with per-photo state saves; `FlickrClient` interface for testability; `State` with atomic save via temp+rename
+- **Flickr client (`internal/flickr`)** — OAuth 1.0a signing via `dghubble/oauth1` transport; `UploadPhoto`, `SetDateTaken`, `CreatePhotoset`, `AddPhotoToPhotoset`, `TestLogin`, `CheckAuth`; full unit test suite
+- **Browser OAuth flow** — `GET /oauth/start/{provider}` initiates OAuth 1.0a; `GET /oauth/callback/v1/{provider}` exchanges token and stores access credentials in cookies; `return_to` cookie preserves post-auth destination; open redirect guard
+- **Flickr verify** — `GET /flickr/verify` confirms OAuth credentials end-to-end via `flickr.test.login`
+- **Browser-triggered album upload** — `GET /flickr/upload/{id}` shows confirmation (photoset list + photo counts); `POST /flickr/upload/{id}` runs upload synchronously via `uploader` package; redirects through OAuth if no token cookie present; state file path configurable via `flickr_state_path`
+
+---
+
+## Known limitations / future work
+
+- **Upload is synchronous** — The `POST /flickr/upload/{id}` handler runs the full upload in-band. For large albums this can take many minutes; the browser connection holds open until done. A background job with a status page would be a better UX.
+- **No rate limiting** — The uploader does not throttle Flickr API calls. Flickr's limits are generous but a very large upload could hit them.
 
 ---
 
@@ -35,25 +48,7 @@ Integration tests against a real MySQL instance. The Gallery 2 schema is fixed a
 - `TestItemPath` — known photo ID, verify reconstructed path starts with `albums/` and uses forward slashes
 - `TestGetDerivatives` / `TestGetThumbnail` — known photo ID with derivatives
 
-### 2. Flickr export / upload (`cmd/flickr_upload`)
-
-A standalone binary that uploads photos from selected Gallery 2 albums to Flickr. Movies are not uploaded. Photos are uploaded as private. Preserve as much Gallery 2 metadata as possible (title, description/caption, tags, date taken).
-
-#### Album selection and naming
-
-- The user specifies one or more album IDs on the command line; each selected album is walked recursively, uploading all descendant photos.
-- Each album (selected or descended) becomes a Flickr photoset. Flickr photosets have no parent/child relationship, so the hierarchy is flattened.
-- To make the flat list navigable, child album titles are prefixed with their parent's title: `{parent album title} - {child album title}`. This is applied recursively, so a grandchild becomes `{grandparent} - {parent} - {child}`.
-
-#### Design notes
-
-- Reuse `gallery.Store` for all data access — no new DB queries in the upload layer
-- OAuth 1.0a flow for Flickr authentication; store credentials in a local config or env vars
-- Skip already-uploaded items (track by storing Flickr photo/photoset IDs in a local flat file index keyed by Gallery 2 item ID)
-- Respect Flickr rate limits; log progress per item
-- `cmd/flickr_upload` takes `-config` (same TOML as the server), one or more album IDs as positional arguments, plus Flickr-specific flags (`-flickr-key`, `-flickr-secret`, `-flickr-token`, `-flickr-token-secret`), `-state` (path to the progress file, default `flickr_upload.json`), and `-dryrun` (print the planned albums and photos without uploading anything)
-
-### 3. gRPC / protobuf interface (future)
+### 2. gRPC / protobuf interface (future)
 
 A secondary read-only interface for mobile clients. Design notes:
 
