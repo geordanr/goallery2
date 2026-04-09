@@ -259,6 +259,46 @@ func TestSetDateTaken_ServerError(t *testing.T) {
 	}
 }
 
+// ── TestLogin ─────────────────────────────────────────────────────────────────
+
+func TestTestLogin_OK(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Errorf("ParseForm: %v", err)
+		}
+		if r.FormValue("method") != "flickr.test.login" {
+			t.Errorf("method = %q, want flickr.test.login", r.FormValue("method"))
+		}
+		_, _ = fmt.Fprint(w, `<?xml version="1.0" encoding="utf-8"?><rsp stat="ok"><user id="123"><username>testuser</username></user></rsp>`)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(nil, srv)
+	username, err := c.TestLogin()
+	if err != nil {
+		t.Fatalf("TestLogin: %v", err)
+	}
+	if username != "testuser" {
+		t.Errorf("username = %q, want %q", username, "testuser")
+	}
+}
+
+func TestTestLogin_Failure(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, errResponse("98", "Login failed / Invalid auth token"))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(nil, srv)
+	_, err := c.TestLogin()
+	if err == nil {
+		t.Fatal("expected error for failed login, got nil")
+	}
+	if !strings.Contains(err.Error(), "Login failed") {
+		t.Errorf("error should contain server message; got %v", err)
+	}
+}
+
 // ── sign ──────────────────────────────────────────────────────────────────────
 
 func TestSign_Deterministic(t *testing.T) {

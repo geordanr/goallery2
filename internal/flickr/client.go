@@ -114,6 +114,39 @@ func (c *Client) UploadPhoto(diskPath, title, description, tags string) (string,
 	return result.PhotoID, nil
 }
 
+// TestLogin calls flickr.test.login to verify that the access token is valid
+// and returns the authenticated user's username.
+func (c *Client) TestLogin() (string, error) {
+	params := map[string]string{
+		"method":  "flickr.test.login",
+		"api_key": c.creds.APIKey,
+		"format":  "rest",
+	}
+	resp, err := c.callAPI(params)
+	if err != nil {
+		return "", fmt.Errorf("flickr.test.login: %w", err)
+	}
+
+	var result struct {
+		XMLName xml.Name `xml:"rsp"`
+		Stat    string   `xml:"stat,attr"`
+		User    struct {
+			Username string `xml:"username"`
+		} `xml:"user"`
+		Err struct {
+			Code string `xml:"code,attr"`
+			Msg  string `xml:"msg,attr"`
+		} `xml:"err"`
+	}
+	if err := xml.Unmarshal(resp, &result); err != nil {
+		return "", fmt.Errorf("parsing flickr.test.login response: %w", err)
+	}
+	if result.Stat != "ok" {
+		return "", fmt.Errorf("flickr.test.login failed (code %s): %s", result.Err.Code, result.Err.Msg)
+	}
+	return result.User.Username, nil
+}
+
 // CheckAuth calls flickr.test.echo to verify that the credentials are valid
 // and that signed requests reach Flickr correctly. Returns nil on success, or
 // an error describing the failure (network, signing, or API-level rejection).

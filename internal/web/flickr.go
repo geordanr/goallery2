@@ -2,14 +2,18 @@ package web
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"path"
 	"strings"
 	"time"
 
 	"github.com/dghubble/oauth1"
 	"github.com/go-chi/chi/v5"
+
+	"github.com/geordanr/goallery2/internal/flickr"
 )
 
 // TODO(geordan): move OAuth provider implementations to a separate oauth.go file in this package.
@@ -122,4 +126,46 @@ func (h *handler) oauthV1Callback(w http.ResponseWriter, r *http.Request) {
 	// path.Join cleans the result and avoids a double-slash if BaseURL ever
 	// gains a trailing slash.
 	http.Redirect(w, r, h.config.Server.BaseURL()+path.Join("/", redirPath), http.StatusFound)
+}
+
+// flickrVerify checks whether the user has a valid Flickr access token and,
+// if so, calls flickr.test.login to confirm it works end-to-end. If no token
+// cookie is present the user is redirected through the OAuth flow first.
+func (h *handler) flickrVerify(w http.ResponseWriter, r *http.Request) {
+	tokenCookie, tokenErr := r.Cookie("flickr_access_token")
+	secretCookie, secretErr := r.Cookie("flickr_access_secret")
+	if tokenErr != nil || secretErr != nil {
+		q := url.Values{"return_to": {"/flickr/verify"}}
+		http.Redirect(w, r, "/oauth/start/flickr?"+q.Encode(), http.StatusFound)
+		return
+	}
+	if tokenCookie.Value == "" || secretCookie.Value == "" {
+		q := url.Values{"return_to": {"/flickr/verify"}}
+		http.Redirect(w, r, "/oauth/start/flickr?"+q.Encode(), http.StatusFound)
+		return
+	}
+
+	oauthCfg, err := h.config.GetOAuthConfig("flickr")
+	if err != nil {
+		slog.Error("could not get OAuth config for flickr", "err", err)
+		http.Error(w, "flickr not configured", http.StatusInternalServerError)
+		return
+	}
+
+	client := flickr.NewClient(flickr.Credentials{
+		APIKey:      oauthCfg.ConsumerKey,
+		APISecret:   oauthCfg.ConsumerSecret,
+		Token:       tokenCookie.Value,
+		TokenSecret: secretCookie.Value,
+	})
+
+	username, err := client.TestLogin()
+	if err != nil {
+		slog.Error("flickr.test.login failed", "err", err)
+		http.Error(w, "Flickr API error", http.StatusBadGateway)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = fmt.Fprintf(w, "Connected to Flickr as: %s\n", username)
 }
