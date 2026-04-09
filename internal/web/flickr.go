@@ -1,12 +1,14 @@
 package web
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +16,8 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/geordanr/goallery2/internal/flickr"
+	"github.com/geordanr/goallery2/internal/gallery"
+	"github.com/geordanr/goallery2/internal/uploader"
 )
 
 // TODO(geordan): move OAuth provider implementations to a separate oauth.go file in this package.
@@ -129,18 +133,23 @@ func (h *handler) oauthV1Callback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, h.config.Server.BaseURL()+path.Join("/", redirPath), http.StatusFound)
 }
 
+// flickrCookies reads the Flickr access token and secret from cookies.
+// Returns the values and ok=true if both are present and non-empty.
+func flickrCookies(r *http.Request) (token, secret string, ok bool) {
+	tc, err1 := r.Cookie("flickr_access_token")
+	sc, err2 := r.Cookie("flickr_access_secret")
+	if err1 != nil || err2 != nil || tc.Value == "" || sc.Value == "" {
+		return "", "", false
+	}
+	return tc.Value, sc.Value, true
+}
+
 // flickrVerify checks whether the user has a valid Flickr access token and,
 // if so, calls flickr.test.login to confirm it works end-to-end. If no token
 // cookie is present the user is redirected through the OAuth flow first.
 func (h *handler) flickrVerify(w http.ResponseWriter, r *http.Request) {
-	tokenCookie, tokenErr := r.Cookie("flickr_access_token")
-	secretCookie, secretErr := r.Cookie("flickr_access_secret")
-	if tokenErr != nil || secretErr != nil {
-		q := url.Values{"return_to": {"/flickr/verify"}}
-		http.Redirect(w, r, "/oauth/start/flickr?"+q.Encode(), http.StatusFound)
-		return
-	}
-	if tokenCookie.Value == "" || secretCookie.Value == "" {
+	token, secret, ok := flickrCookies(r)
+	if !ok {
 		q := url.Values{"return_to": {"/flickr/verify"}}
 		http.Redirect(w, r, "/oauth/start/flickr?"+q.Encode(), http.StatusFound)
 		return
@@ -156,8 +165,8 @@ func (h *handler) flickrVerify(w http.ResponseWriter, r *http.Request) {
 	client := flickr.NewClient(flickr.Credentials{
 		APIKey:      oauthCfg.ConsumerKey,
 		APISecret:   oauthCfg.ConsumerSecret,
-		Token:       tokenCookie.Value,
-		TokenSecret: secretCookie.Value,
+		Token:       token,
+		TokenSecret: secret,
 	})
 
 	username, err := client.TestLogin()
@@ -169,4 +178,110 @@ func (h *handler) flickrVerify(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = fmt.Fprintf(w, "Connected to Flickr as: %s\n", username)
+}
+
+// flickrUploadPageData is shared by the confirmation (GET) and result (POST)
+// views of the upload page.
+type flickrUploadPageData struct {
+	Album       *gallery.Album
+	Uploads     []uploader.AlbumUpload
+	TotalPhotos int
+	Done        bool   // true after a POST completes
+	UploadErr   string // non-empty if the upload failed
+}
+
+// flickrUpload handles GET (confirmation) and POST (run upload) for a single
+// album. It checks for valid Flickr cookies first; missing tokens redirect
+// through the OAuth flow with return_to pointing back here.
+func (h *handler) flickrUpload(w http.ResponseWriter, r *http.Request) {
+	token, secret, ok := flickrCookies(r)
+	if !ok {
+		q := url.Values{"return_to": {r.URL.RequestURI()}}
+		http.Redirect(w, r, "/oauth/start/flickr?"+q.Encode(), http.StatusFound)
+		return
+	}
+
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid album id", http.StatusBadRequest)
+		return
+	}
+
+	album, err := h.store.GetAlbum(id)
+	if errors.Is(err, sql.ErrNoRows) {
+		http.Error(w, "album not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		slog.Error("fetching album for Flickr upload", "album_id", id, "err", err)
+		http.Error(w, "error loading album", http.StatusInternalServerError)
+		return
+	}
+
+	if r.Method == http.MethodGet {
+		uploads, err := uploader.Walk(h.store, []int{id})
+		if err != nil {
+			slog.Error("walking albums for Flickr upload", "album_id", id, "err", err)
+			http.Error(w, "error loading album structure", http.StatusInternalServerError)
+			return
+		}
+		totalPhotos := 0
+		for _, u := range uploads {
+			totalPhotos += len(u.Photos)
+		}
+		data := flickrUploadPageData{
+			Album:       album,
+			Uploads:     uploads,
+			TotalPhotos: totalPhotos,
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := flickrUploadTmpl.Execute(w, data); err != nil {
+			slog.Error("rendering flickr upload page", "err", err)
+		}
+		return
+	}
+
+	// POST: run the upload.
+	oauthCfg, err := h.config.GetOAuthConfig("flickr")
+	if err != nil {
+		slog.Error("could not get OAuth config for flickr", "err", err)
+		http.Error(w, "flickr not configured", http.StatusInternalServerError)
+		return
+	}
+
+	uploads, err := uploader.Walk(h.store, []int{id})
+	if err != nil {
+		slog.Error("walking albums for Flickr upload", "album_id", id, "err", err)
+		http.Error(w, "error loading album structure", http.StatusInternalServerError)
+		return
+	}
+
+	statePath := h.config.Server.FlickrStatePath
+	state, err := uploader.LoadState(statePath)
+	if err != nil {
+		slog.Error("loading Flickr upload state", "path", statePath, "err", err)
+		http.Error(w, "error loading upload state", http.StatusInternalServerError)
+		return
+	}
+
+	client := flickr.NewClient(flickr.Credentials{
+		APIKey:      oauthCfg.ConsumerKey,
+		APISecret:   oauthCfg.ConsumerSecret,
+		Token:       token,
+		TokenSecret: secret,
+	})
+
+	// TODO: the upload runs synchronously in the HTTP handler; for large albums
+	// it can take many minutes. Monitor server logs for per-photo progress.
+	u := uploader.New(client, state, statePath, h.absDataDir, false)
+	data := flickrUploadPageData{Album: album, Done: true}
+	if uploadErr := u.Run(uploads); uploadErr != nil {
+		slog.Error("Flickr upload failed", "album_id", id, "err", uploadErr)
+		data.UploadErr = uploadErr.Error()
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := flickrUploadTmpl.Execute(w, data); err != nil {
+		slog.Error("rendering flickr upload result page", "err", err)
+	}
 }

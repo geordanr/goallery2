@@ -18,9 +18,10 @@ type Config struct {
 
 // ServerConfig holds HTTP server settings.
 type ServerConfig struct {
-	Addr         string                         `toml:"addr"`
-	DataDir      string                         `toml:"data_dir"`
-	OAuthConfigs map[string]OAuthProviderConfig `toml:"oauth"`
+	Addr            string                         `toml:"addr"`
+	DataDir         string                         `toml:"data_dir"`
+	FlickrStatePath string                         `toml:"flickr_state_path"`
+	OAuthConfigs    map[string]OAuthProviderConfig `toml:"oauth"`
 }
 
 // DBConfig holds MySQL connection settings.
@@ -46,7 +47,8 @@ type OAuthProviderConfig struct {
 func defaults() Config {
 	return Config{
 		Server: ServerConfig{
-			Addr: ":8080",
+			Addr:            ":8080",
+			FlickrStatePath: "flickr_upload.json",
 			// DataDir has no default — it must be set explicitly via config file
 			// or the -data-dir flag, since it is installation-specific.
 		},
