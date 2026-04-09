@@ -28,14 +28,31 @@
 
 ## Known limitations / future work
 
-- **Upload is synchronous** — The `POST /flickr/upload/{id}` handler runs the full upload in-band. For large albums this can take many minutes; the browser connection holds open until done. A background job with a status page would be a better UX.
 - **No rate limiting** — The uploader does not throttle Flickr API calls. Flickr's limits are generous but a very large upload could hit them.
 
 ---
 
 ## Next up
 
-### 1. `internal/gallery` integration tests
+### 1. Upload progress + photoset links
+
+Stream per-photo progress to the browser during upload, and show links to the resulting Flickr photosets on completion.
+
+#### Approach: chunked HTML streaming with auto-scroll
+
+- `POST /flickr/upload/{id}` switches to chunked streaming: write and flush HTML incrementally rather than buffering until done
+- Write a `<ul>` with one `<li>` per uploaded photo (title + "skipped" or "uploaded" status), flushing after each
+- On completion, write a final section listing per-photoset Flickr links (`https://www.flickr.com/photos/{username}/sets/{photosetID}/`)
+- Add a small `<script>` that auto-scrolls to the bottom as content arrives
+- Flickr username obtained via `client.TestLogin()` once before the upload starts
+
+#### Implementation changes
+
+- `Uploader`: add `Progress func(photoTitle string, skipped bool)` field; called in `ensureUploaded` after each photo (skipped or uploaded); nil-safe (CLI leaves it unset)
+- `flickrUpload` POST handler: obtain username via `TestLogin` before starting; pass a `Progress` closure that writes+flushes a `<li>`; after `Run` completes, write photoset links from state and close the HTML
+- No new template needed for the streaming portion — the handler writes HTML directly; the GET confirmation page template is unchanged
+
+### 2. `internal/gallery` integration tests
 
 Integration tests against a real MySQL instance. The Gallery 2 schema is fixed and read-only, so mocking the DB would hide real query errors.
 
