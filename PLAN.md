@@ -22,7 +22,8 @@
 - **Flickr client (`internal/flickr`)** — OAuth 1.0a signing via `dghubble/oauth1` transport; `UploadPhoto`, `SetDateTaken`, `CreatePhotoset`, `AddPhotoToPhotoset`, `TestLogin`, `CheckAuth`; full unit test suite
 - **Browser OAuth flow** — `GET /oauth/start/{provider}` initiates OAuth 1.0a; `GET /oauth/callback/v1/{provider}` exchanges token and stores access credentials in cookies; `return_to` cookie preserves post-auth destination; open redirect guard
 - **Flickr verify** — `GET /flickr/verify` confirms OAuth credentials end-to-end via `flickr.test.login`
-- **Browser-triggered album upload** — `GET /flickr/upload/{id}` shows confirmation (photoset list + photo counts); `POST /flickr/upload/{id}` runs upload synchronously via `uploader` package; redirects through OAuth if no token cookie present; state file path configurable via `flickr_state_path`
+- **Browser-triggered album upload** — `GET /flickr/upload/{id}` shows confirmation (photoset list + photo counts); `POST /flickr/upload/{id}` streams chunked HTML progress (one `<li>` per photo, auto-scroll via MutationObserver); shows per-photoset Flickr links on completion; redirects through OAuth if no token cookie present
+- **Upload progress streaming** — `Uploader.Progress func(title string, skipped bool)` callback called per photo; POST handler passes a closure that writes+flushes a `<li>`; CLI leaves it nil
 
 ---
 
@@ -34,23 +35,23 @@
 
 ## Next up
 
-### 1. Upload progress + photoset links
+### 1. Conditional "Upload to Flickr" link
 
-Stream per-photo progress to the browser during upload, and show links to the resulting Flickr photosets on completion.
+Only show the "Upload to Flickr" footer link on the album page when there are photos in the album tree that have not yet been uploaded.
 
-#### Approach: chunked HTML streaming with auto-scroll
+#### Approach
 
-- `POST /flickr/upload/{id}` switches to chunked streaming: write and flush HTML incrementally rather than buffering until done
-- Write a `<ul>` with one `<li>` per uploaded photo (title + "skipped" or "uploaded" status), flushing after each
-- On completion, write a final section listing per-photoset Flickr links (`https://www.flickr.com/photos/{username}/sets/{photosetID}/`)
-- Add a small `<script>` that auto-scrolls to the bottom as content arrives
-- Flickr username obtained via `client.TestLogin()` once before the upload starts
+- Load the Flickr state file in the album handler (`LoadState`); if the file is missing or unreadable, treat all photos as not uploaded (i.e., show the link)
+- Call `uploader.Walk` to get the flat list of photos in the album tree
+- Compare each photo ID against `state.Photos`; if any photo is absent from the state, show the link
+- If all photos are present in the state (or the album tree has no photos), suppress the link
+- Pass a `ShowFlickrUpload bool` field in `albumData` to the template
 
-#### Implementation changes
+#### Notes
 
-- `Uploader`: add `Progress func(photoTitle string, skipped bool)` field; called in `ensureUploaded` after each photo (skipped or uploaded); nil-safe (CLI leaves it unset)
-- `flickrUpload` POST handler: obtain username via `TestLogin` before starting; pass a `Progress` closure that writes+flushes a `<li>`; after `Run` completes, write photoset links from state and close the HTML
-- No new template needed for the streaming portion — the handler writes HTML directly; the GET confirmation page template is unchanged
+- `uploader.Walk` is already used by the upload handler, so the logic is reusable
+- The state file read is a fast local JSON parse; acceptable overhead per album page load
+- Albums with no photos at all should suppress the link (nothing to upload)
 
 ### 2. `internal/gallery` integration tests
 
