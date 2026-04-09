@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -90,9 +91,14 @@ func TestUploadPhoto_ServerError(t *testing.T) {
 	}
 }
 
-func TestUploadPhoto_MultipartContainsFile(t *testing.T) {
+// TestUploadPhoto_ParamsAsQueryAndFileAsMultipart verifies that non-file params
+// are sent as URL query parameters (so they are covered by the OAuth signature)
+// and that the multipart body contains only the photo file.
+func TestUploadPhoto_ParamsAsQueryAndFileAsMultipart(t *testing.T) {
+	var gotQuery url.Values
 	var gotParts []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query()
 		mediaType, params, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		if strings.HasPrefix(mediaType, "multipart/") {
 			mr := multipart.NewReader(r.Body, params["boundary"])
@@ -117,18 +123,27 @@ func TestUploadPhoto_MultipartContainsFile(t *testing.T) {
 	}
 
 	c := newTestClient(srv, nil)
-	if _, err := c.UploadPhoto(tmpFile, "title", "desc", "t"); err != nil {
+	if _, err := c.UploadPhoto(tmpFile, "My Title", "My Desc", "tag1"); err != nil {
 		t.Fatalf("UploadPhoto: %v", err)
 	}
 
-	wantParts := map[string]bool{"title": false, "description": false, "photo": false}
-	for _, name := range gotParts {
-		wantParts[name] = true
-	}
-	for name, found := range wantParts {
-		if !found {
-			t.Errorf("multipart request missing field %q", name)
+	// API params must appear in the query string with the correct values.
+	for _, tc := range []struct{ key, want string }{
+		{"title", "My Title"},
+		{"description", "My Desc"},
+		{"tags", "tag1"},
+		{"is_public", "0"},
+		{"is_friend", "0"},
+		{"is_family", "0"},
+	} {
+		if got := gotQuery.Get(tc.key); got != tc.want {
+			t.Errorf("query param %q = %q, want %q", tc.key, got, tc.want)
 		}
+	}
+
+	// Multipart body must contain only the photo file.
+	if len(gotParts) != 1 || gotParts[0] != "photo" {
+		t.Errorf("multipart parts = %v, want [photo]", gotParts)
 	}
 }
 

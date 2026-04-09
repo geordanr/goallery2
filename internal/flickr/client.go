@@ -8,6 +8,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -68,18 +69,23 @@ func (c *Client) effectiveAPIURL() string {
 // UploadPhoto uploads the photo at diskPath to Flickr as a private photo.
 // title, description, and tags are set from Gallery 2 metadata. Returns the
 // Flickr photo ID. Date taken must be set separately via SetDateTaken.
+//
+// Non-file parameters are sent as URL query parameters rather than multipart
+// form fields. dghubble/oauth1 includes query parameters in the OAuth
+// signature but excludes multipart body fields, so this ensures both sides
+// compute the same signature base string.
 func (c *Client) UploadPhoto(diskPath, title, description, tags string) (string, error) {
-	params := map[string]string{
-		"title":       title,
-		"description": description,
-		"tags":        tags,
-		"is_public":   "0",
-		"is_friend":   "0",
-		"is_family":   "0",
+	q := url.Values{
+		"title":       {title},
+		"description": {description},
+		"tags":        {tags},
+		"is_public":   {"0"},
+		"is_friend":   {"0"},
+		"is_family":   {"0"},
 	}
+	rawURL := c.effectiveUploadURL() + "?" + q.Encode()
 
-	rawURL := c.effectiveUploadURL()
-	body, contentType, err := buildUploadBody(diskPath, params)
+	body, contentType, err := buildUploadBody(diskPath)
 	if err != nil {
 		return "", fmt.Errorf("building upload request for %q: %w", diskPath, err)
 	}
@@ -105,6 +111,7 @@ func (c *Client) UploadPhoto(diskPath, title, description, tags string) (string,
 		} `xml:"err"`
 	}
 	if err := xml.Unmarshal(raw, &result); err != nil {
+		slog.Debug("could not parse XML response", "raw", raw)
 		return "", fmt.Errorf("parsing upload response: %w", err)
 	}
 	if result.Stat != "ok" {
@@ -299,22 +306,15 @@ func (c *Client) callAPI(params map[string]string) ([]byte, error) {
 var openFile = func(path string) (*os.File, error) { return os.Open(path) }
 
 // buildUploadBody constructs the multipart/form-data body for a photo upload.
-// OAuth credentials are sent via the Authorization header by the oauth1 transport,
-// so only API params (title, description, etc.) and the photo file are included here.
-func buildUploadBody(diskPath string, params map[string]string) (io.Reader, string, error) {
+// Only the photo file is included; API params are sent as URL query parameters
+// so they are covered by the OAuth signature base string.
+func buildUploadBody(diskPath string) (io.Reader, string, error) {
 	pr, pw := io.Pipe()
 	mw := multipart.NewWriter(pw)
 
 	go func() {
 		var closeErr error
 		defer func() { _ = pw.CloseWithError(closeErr) }()
-
-		// Write API params as form fields.
-		for k, v := range params {
-			if closeErr = mw.WriteField(k, v); closeErr != nil {
-				return
-			}
-		}
 
 		// Write the photo file.
 		fw, err := mw.CreateFormFile("photo", filepath.Base(diskPath))
