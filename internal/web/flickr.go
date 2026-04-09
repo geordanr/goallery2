@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"html"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -180,14 +181,11 @@ func (h *handler) flickrVerify(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprintf(w, "Connected to Flickr as: %s\n", username)
 }
 
-// flickrUploadPageData is shared by the confirmation (GET) and result (POST)
-// views of the upload page.
+// flickrUploadPageData is used by the GET confirmation view.
 type flickrUploadPageData struct {
 	Album       *gallery.Album
 	Uploads     []uploader.AlbumUpload
 	TotalPhotos int
-	Done        bool   // true after a POST completes
-	UploadErr   string // non-empty if the upload failed
 }
 
 // flickrUpload handles GET (confirmation) and POST (run upload) for a single
@@ -241,7 +239,7 @@ func (h *handler) flickrUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// POST: run the upload.
+	// POST: run the upload, streaming progress to the browser via chunked HTML.
 	oauthCfg, err := h.config.GetOAuthConfig("flickr")
 	if err != nil {
 		slog.Error("could not get OAuth config for flickr", "err", err)
@@ -271,17 +269,102 @@ func (h *handler) flickrUpload(w http.ResponseWriter, r *http.Request) {
 		TokenSecret: secret,
 	})
 
-	// TODO: the upload runs synchronously in the HTTP handler; for large albums
-	// it can take many minutes. Monitor server logs for per-photo progress.
-	u := uploader.New(client, state, statePath, h.absDataDir, false)
-	data := flickrUploadPageData{Album: album, Done: true}
-	if uploadErr := u.Run(uploads); uploadErr != nil {
-		slog.Error("Flickr upload failed", "album_id", id, "err", uploadErr)
-		data.UploadErr = uploadErr.Error()
+	username, err := client.TestLogin()
+	if err != nil {
+		slog.Error("flickr.test.login failed before upload", "err", err)
+		http.Error(w, "Flickr API error", http.StatusBadGateway)
+		return
 	}
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := flickrUploadTmpl.Execute(w, data); err != nil {
-		slog.Error("rendering flickr upload result page", "err", err)
+	flusher, canFlush := w.(http.Flusher)
+	flush := func() {
+		if canFlush {
+			flusher.Flush()
+		}
 	}
+
+	escapedTitle := html.EscapeString(album.Title)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = fmt.Fprintf(w, `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Uploading to Flickr — %s</title>
+  <style>
+    body { font-family: sans-serif; max-width: 900px; margin: 0 auto; padding: 1rem; }
+    h1 { margin-bottom: 0.25rem; }
+    ul.progress { list-style: none; padding: 0; font-size: 0.9rem; }
+    ul.progress li { padding: 0.15rem 0; border-bottom: 1px solid #f0f0f0; }
+    .skipped { color: #999; }
+    .uploaded { color: #2a7a2a; }
+    .error { color: #c00; font-weight: bold; }
+    .photosets { margin-top: 1.5rem; }
+    .photosets a { display: block; margin: 0.3rem 0; }
+  </style>
+</head>
+<body>
+<h1>Uploading to Flickr</h1>
+<p>Album: <a href="/album/%d">%s</a></p>
+<ul class="progress">
+`, escapedTitle, album.ID, escapedTitle)
+	flush()
+
+	u := uploader.New(client, state, statePath, h.absDataDir, false)
+	u.Progress = func(title string, skipped bool) {
+		if skipped {
+			_, _ = fmt.Fprintf(w, "  <li class=\"skipped\">skipped: %s</li>\n", html.EscapeString(title))
+		} else {
+			_, _ = fmt.Fprintf(w, "  <li class=\"uploaded\">uploaded: %s</li>\n", html.EscapeString(title))
+		}
+		flush()
+	}
+
+	uploadErr := u.Run(uploads)
+
+	_, _ = fmt.Fprint(w, "</ul>\n")
+
+	if uploadErr != nil {
+		slog.Error("Flickr upload failed", "album_id", id, "err", uploadErr)
+		_, _ = fmt.Fprintf(w, "<p class=\"error\">Upload failed: %s</p>\n", html.EscapeString(uploadErr.Error()))
+	} else {
+		_, _ = fmt.Fprint(w, "<p><strong>Upload complete.</strong></p>\n")
+	}
+
+	// Reload state to get photoset IDs written during this run.
+	finalState, err := uploader.LoadState(statePath)
+	if err != nil {
+		slog.Warn("could not reload state for photoset links", "err", err)
+		_, _ = fmt.Fprint(w, "<p class=\"error\">Could not load state file for photoset links.</p>\n")
+		finalState = state
+	}
+
+	var photosetLinks []string
+	for _, au := range uploads {
+		if psID, ok := finalState.Photosets[au.SourceAlbum.ID]; ok {
+			flickrURL := fmt.Sprintf("https://www.flickr.com/photos/%s/sets/%s/",
+				url.PathEscape(username), url.PathEscape(psID))
+			photosetLinks = append(photosetLinks,
+				fmt.Sprintf("  <a href=\"%s\" target=\"_blank\" rel=\"noopener\">%s</a>",
+					html.EscapeString(flickrURL), html.EscapeString(au.FlickrTitle)))
+		}
+	}
+	if len(photosetLinks) > 0 {
+		_, _ = fmt.Fprint(w, "<div class=\"photosets\"><h2>Flickr photosets</h2>\n")
+		for _, link := range photosetLinks {
+			_, _ = fmt.Fprintln(w, link)
+		}
+		_, _ = fmt.Fprint(w, "</div>\n")
+	}
+
+	_, _ = fmt.Fprintf(w, `<p><a href="/album/%d">&larr; Back to album</a></p>
+<script>
+  // Auto-scroll to bottom as content streams in.
+  const observer = new MutationObserver(() => window.scrollTo(0, document.body.scrollHeight));
+  observer.observe(document.body, { childList: true, subtree: true });
+</script>
+</body>
+</html>
+`, album.ID)
+	flush()
 }

@@ -27,6 +27,9 @@ type Uploader struct {
 	statePath string
 	dataDir   string
 	dryRun    bool
+	// Progress is called after each photo is processed (uploaded or skipped).
+	// It is optional; nil means no progress reporting.
+	Progress func(title string, skipped bool)
 }
 
 // New creates an Uploader.
@@ -145,11 +148,16 @@ func (u *Uploader) processAlbum(au AlbumUpload) error {
 // ensureUploaded uploads a single photo to Flickr if not already done. Returns
 // the Flickr photo ID (from state or freshly uploaded), or an error.
 func (u *Uploader) ensureUploaded(photo gallery.Photo) (string, error) {
+	title := photoTitle(photo)
+
 	if flickrID, ok := u.state.Photos[photo.ID]; ok {
 		slog.Info("skipping already-uploaded photo",
 			"gallery_photo_id", photo.ID,
 			"flickr_photo_id", flickrID,
 		)
+		if u.Progress != nil {
+			u.Progress(title, true)
+		}
 		return flickrID, nil
 	}
 
@@ -160,7 +168,7 @@ func (u *Uploader) ensureUploaded(photo gallery.Photo) (string, error) {
 	diskPath := filepath.Join(u.dataDir, filepath.FromSlash(relPath))
 
 	tags := buildTags(photo.Keywords)
-	flickrID, err := u.client.UploadPhoto(diskPath, photoTitle(photo), photo.Description, tags)
+	flickrID, err := u.client.UploadPhoto(diskPath, title, photo.Description, tags)
 	if err != nil {
 		return "", fmt.Errorf("uploading photo %d: %w", photo.ID, err)
 	}
@@ -187,8 +195,11 @@ func (u *Uploader) ensureUploaded(photo gallery.Photo) (string, error) {
 	slog.Info("uploaded photo",
 		"gallery_photo_id", photo.ID,
 		"flickr_photo_id", flickrID,
-		"title", photoTitle(photo),
+		"title", title,
 	)
+	if u.Progress != nil {
+		u.Progress(title, false)
+	}
 	return flickrID, nil
 }
 
