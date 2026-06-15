@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/geordanr/goallery2/internal/flickr"
 	"github.com/geordanr/goallery2/internal/gallery"
 )
 
@@ -14,6 +15,7 @@ import (
 // satisfies this interface; tests substitute a fake.
 type FlickrClient interface {
 	UploadPhoto(diskPath, title, description, tags string) (string, error)
+	SetPermissions(photoID string, p flickr.Permissions) error
 	SetDateTaken(photoID string, dateTaken time.Time) error
 	CreatePhotoset(title, primaryPhotoID string) (string, error)
 	AddPhotoToPhotoset(photosetID, photoID string) error
@@ -147,38 +149,44 @@ func (u *Uploader) processAlbum(au AlbumUpload) error {
 
 // ensureUploaded uploads a single photo to Flickr if not already done. Returns
 // the Flickr photo ID (from state or freshly uploaded), or an error.
+//
+// Post-upload API calls (SetPermissions, SetDateTaken) run on every invocation,
+// even when the photo was found in state. This lets a re-run finish work that a
+// prior crash interrupted after the upload was persisted but before those calls
+// completed.
 func (u *Uploader) ensureUploaded(photo gallery.Photo) (string, error) {
 	title := photoTitle(photo)
 
-	if flickrID, ok := u.state.Photos[photo.ID]; ok {
-		slog.Info("skipping already-uploaded photo",
-			"gallery_photo_id", photo.ID,
-			"flickr_photo_id", flickrID,
-		)
-		if u.Progress != nil {
-			u.Progress(title, true)
+	flickrID, alreadyUploaded := u.state.Photos[photo.ID]
+
+	if !alreadyUploaded {
+		relPath, err := photo.Path()
+		if err != nil {
+			return "", fmt.Errorf("resolving disk path for photo %d: %w", photo.ID, err)
 		}
-		return flickrID, nil
+		diskPath := filepath.Join(u.dataDir, filepath.FromSlash(relPath))
+
+		tags := buildTags(photo.Keywords)
+		flickrID, err = u.client.UploadPhoto(diskPath, title, photo.Description, tags)
+		if err != nil {
+			return "", fmt.Errorf("uploading photo %d: %w", photo.ID, err)
+		}
+
+		// Persist before post-upload calls. If state cannot be saved the upload
+		// is still orphaned on Flickr, but returning an error here prevents
+		// further in-run work against an un-checkpointed ID and makes the
+		// failure visible rather than silently risking duplicate uploads.
+		u.state.Photos[photo.ID] = flickrID
+		if err := SaveState(u.statePath, u.state); err != nil {
+			return "", fmt.Errorf("saving state after uploading photo %d: %w", photo.ID, err)
+		}
 	}
 
-	relPath, err := photo.Path()
-	if err != nil {
-		return "", fmt.Errorf("resolving disk path for photo %d: %w", photo.ID, err)
-	}
-	diskPath := filepath.Join(u.dataDir, filepath.FromSlash(relPath))
-
-	tags := buildTags(photo.Keywords)
-	flickrID, err := u.client.UploadPhoto(diskPath, title, photo.Description, tags)
-	if err != nil {
-		return "", fmt.Errorf("uploading photo %d: %w", photo.ID, err)
-	}
-
-	// Persist before any post-upload calls so a crash in SetDateTaken does not
-	// orphan the upload: the next run will find the ID in state and skip the
-	// upload, then retry SetDateTaken.
-	u.state.Photos[photo.ID] = flickrID
-	if err := SaveState(u.statePath, u.state); err != nil {
-		slog.Warn("failed to save state after uploading photo", "err", err)
+	// Enforce private permissions explicitly. Flickr ignores per-upload privacy
+	// params when the account's default privacy is "public", so this call is
+	// required to ensure photos are never publicly visible. It is idempotent.
+	if err := u.client.SetPermissions(flickrID, flickr.Permissions{}); err != nil {
+		return "", fmt.Errorf("setting permissions for photo %d: %w", photo.ID, err)
 	}
 
 	// Explicitly set date taken from Gallery 2 metadata even though Flickr can
@@ -192,13 +200,14 @@ func (u *Uploader) ensureUploaded(photo gallery.Photo) (string, error) {
 		}
 	}
 
-	slog.Info("uploaded photo",
+	slog.Info("processed photo",
 		"gallery_photo_id", photo.ID,
 		"flickr_photo_id", flickrID,
 		"title", title,
+		"skipped_upload", alreadyUploaded,
 	)
 	if u.Progress != nil {
-		u.Progress(title, false)
+		u.Progress(title, alreadyUploaded)
 	}
 	return flickrID, nil
 }

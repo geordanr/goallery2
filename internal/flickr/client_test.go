@@ -30,6 +30,10 @@ func okAddPhotoResponse() string {
 	return `<?xml version="1.0" encoding="utf-8"?><rsp stat="ok"/>`
 }
 
+func okSetPermsResponse() string {
+	return `<?xml version="1.0" encoding="utf-8"?><rsp stat="ok"/>`
+}
+
 func newTestClient(uploadSrv, apiSrv *httptest.Server) *Client {
 	c := NewClient(Credentials{
 		APIKey:      "key",
@@ -234,6 +238,53 @@ func TestAddPhotoToPhotoset_ServerError(t *testing.T) {
 	c := newTestClient(nil, srv)
 	if err := c.AddPhotoToPhotoset("ps1", "bad"); err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+// ── SetPermissions ────────────────────────────────────────────────────────────
+
+func TestSetPermissions_OK(t *testing.T) {
+	var gotForm url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Errorf("ParseForm: %v", err)
+			return
+		}
+		gotForm = r.Form
+		_, _ = fmt.Fprint(w, okSetPermsResponse())
+	}))
+	defer srv.Close()
+
+	c := newTestClient(nil, srv)
+	if err := c.SetPermissions("p1", Permissions{}); err != nil {
+		t.Fatalf("SetPermissions: %v", err)
+	}
+	if got := gotForm.Get("method"); got != "flickr.photos.setPerms" {
+		t.Errorf("method = %q, want %q", got, "flickr.photos.setPerms")
+	}
+	if got := gotForm.Get("photo_id"); got != "p1" {
+		t.Errorf("photo_id = %q, want %q", got, "p1")
+	}
+	for _, field := range []string{"is_public", "is_friend", "is_family", "perm_comment", "perm_addmeta"} {
+		if got := gotForm.Get(field); got != "0" {
+			t.Errorf("%s = %q, want %q", field, got, "0")
+		}
+	}
+}
+
+func TestSetPermissions_ServerError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, errResponse("1", "Photo not found"))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(nil, srv)
+	err := c.SetPermissions("bad", Permissions{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Photo not found") {
+		t.Errorf("error should contain Flickr message; got %v", err)
 	}
 }
 

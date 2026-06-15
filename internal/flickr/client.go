@@ -32,6 +32,14 @@ type Credentials struct {
 	TokenSecret string
 }
 
+// Permissions controls who can see a Flickr photo.
+// The zero value makes a photo completely private (owner-only).
+type Permissions struct {
+	IsPublic bool // visible to everyone
+	IsFriend bool // visible to contacts marked as friends
+	IsFamily bool // visible to contacts marked as family
+}
+
 // Client is a minimal Flickr API client.
 type Client struct {
 	creds     Credentials
@@ -186,6 +194,44 @@ func (c *Client) CheckAuth() error {
 	return nil
 }
 
+// SetPermissions applies p to a photo via flickr.photos.setPerms. This must be
+// called after upload because Flickr ignores per-upload privacy params when the
+// account's default privacy setting is "public". Pass Permissions{} to make a
+// photo completely private.
+func (c *Client) SetPermissions(photoID string, p Permissions) error {
+	params := map[string]string{
+		"method":       "flickr.photos.setPerms",
+		"api_key":      c.creds.APIKey,
+		"photo_id":     photoID,
+		"is_public":    boolParam(p.IsPublic),
+		"is_friend":    boolParam(p.IsFriend),
+		"is_family":    boolParam(p.IsFamily),
+		"perm_comment": "0",
+		"perm_addmeta": "0",
+		"format":       "rest",
+	}
+	resp, err := c.callAPI(params)
+	if err != nil {
+		return fmt.Errorf("setting permissions for photo %s: %w", photoID, err)
+	}
+
+	var result struct {
+		XMLName xml.Name `xml:"rsp"`
+		Stat    string   `xml:"stat,attr"`
+		Err     struct {
+			Code string `xml:"code,attr"`
+			Msg  string `xml:"msg,attr"`
+		} `xml:"err"`
+	}
+	if err := xml.Unmarshal(resp, &result); err != nil {
+		return fmt.Errorf("parsing setPerms response: %w", err)
+	}
+	if result.Stat != "ok" {
+		return fmt.Errorf("flickr.photos.setPerms failed (code %s): %s", result.Err.Code, result.Err.Msg)
+	}
+	return nil
+}
+
 // SetDateTaken sets the date taken on an already-uploaded photo via
 // flickr.photos.setDates. dateTaken must be non-zero.
 func (c *Client) SetDateTaken(photoID string, dateTaken time.Time) error {
@@ -282,6 +328,13 @@ func (c *Client) AddPhotoToPhotoset(photosetID, photoID string) error {
 		return fmt.Errorf("addPhoto failed (code %s): %s", result.Err.Code, result.Err.Msg)
 	}
 	return nil
+}
+
+func boolParam(b bool) string {
+	if b {
+		return "1"
+	}
+	return "0"
 }
 
 // callAPI posts a signed REST API call and returns the raw response body.

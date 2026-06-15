@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/geordanr/goallery2/internal/flickr"
 	"github.com/geordanr/goallery2/internal/gallery"
 )
 
@@ -31,6 +32,8 @@ func (f *fakeFlickr) UploadPhoto(diskPath, _, _, _ string) (string, error) {
 	f.uploadIDSeq++
 	return fmt.Sprintf("fid%d", f.uploadIDSeq), nil
 }
+
+func (f *fakeFlickr) SetPermissions(_ string, _ flickr.Permissions) error { return nil }
 
 func (f *fakeFlickr) SetDateTaken(_ string, _ time.Time) error { return nil }
 
