@@ -72,7 +72,7 @@ callback          = "/oauth/callback/v1/flickr"
 
 ### Browser-based (recommended)
 
-With Flickr OAuth configured, an **Upload to Flickr** link appears at the bottom of each album page when the album contains photos not yet uploaded. Clicking it walks you through OAuth (once) and then shows a confirmation page before starting the upload. Progress streams to the browser as each photo is processed; Flickr photoset links appear on completion.
+With Flickr OAuth configured, an **Upload to Flickr** link appears at the bottom of each album page. Clicking it walks you through OAuth (once) and then shows a confirmation page before starting the upload. Progress streams to the browser as each photo is processed; Flickr photoset links appear on completion.
 
 Upload state is stored in `flickr_upload.json` (configurable via `flickr_state_path` in the config). Re-running an upload skips already-uploaded photos.
 
